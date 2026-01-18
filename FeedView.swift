@@ -9,10 +9,14 @@ struct FeedView: View {
     @Binding var likedTags: Set<String>
     @Binding var videos: [Video]
     @State private var lastIndex = 0
-    @State private var score = 0
+    @Binding var score: Int
     @State private var lastScore = 0
     @Binding var following: Set<String>
     @Binding var chats: [Chat]
+    @AppStorage("autoscroll") var autoscroll = false
+    @State private var isAutoscrolling = false
+    @State private var timer: Timer?
+    @State private var lastAutoscroll = false
     var body: some View {
         GeometryReader { geometry in
             NavigationStack{
@@ -30,6 +34,36 @@ struct FeedView: View {
                                 }
                                 .frame(width: 50, height: 50)
                                 .glassEffect(.regular)
+                                if autoscroll{
+                                    Button{
+                                        isAutoscrolling.toggle()
+                                    }label: {
+                                        Image(systemName: isAutoscrolling ? "pause.fill" : "play.fill")
+                                    }
+                                    .contentTransition(.symbolEffect(.replace))
+                                    .frame(width: 50, height: 50)
+                                    .glassEffect(.regular)
+                                    .onChange(of: isAutoscrolling) { oldValue, newValue in
+                                        if newValue{
+                                            timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+                                                Task { @MainActor in
+                                                    if currentIndex < feed.count - 1 {
+                                                        currentIndex += 1
+                                                    }
+                                                }
+                                            }
+
+                                        }else{
+                                            timer?.invalidate()
+                                        }
+                                    }
+                                    .onAppear(){
+                                        if autoscroll && !lastAutoscroll{
+                                            isAutoscrolling = true
+                                            lastAutoscroll = true
+                                        }
+                                    }
+                                }
                                 Button{
                                     if currentIndex < feed.count - 1{
                                         currentIndex += 1
@@ -71,7 +105,7 @@ struct FeedView: View {
                                             lastIndex = newValue
                                             lastScore = 0
                                             for tag in feed[currentIndex].tags{
-                                                if likedTags.contains(tag){
+                                                if likedTags.subtracting(additionalTags).contains(tag){
                                                     score += 1
                                                     withAnimation {
                                                         lastScore+=1
@@ -80,7 +114,7 @@ struct FeedView: View {
                                             }
                                             Task{
                                                 do{
-                                                    let video = try await generateVideo(tags: likedTags, creators: following)
+                                                    let video = try await generateVideo(likedTags: likedTags, creators: following, allVideos: videos)
                                                     feed.append(video)
                                                     videos.append(video)
                                                 }catch{
@@ -170,11 +204,14 @@ struct FeedView: View {
                         HStack{
                             Spacer()
                             VStack{
-                                Text("Score: \(score)")
-                                    .bold()
-                                    .padding(10)
-                                    .glassEffect(.regular)
-                                    .padding(.horizontal)
+                                HStack{
+                                    Image(systemName: "face.smiling")
+                                    Text("\(score)")
+                                }
+                                .bold()
+                                .padding(10)
+                                .glassEffect(.regular)
+                                .padding(.horizontal)
                                 if lastScore != 0{
                                     Text("+\(lastScore)")
                                         .foregroundStyle(.green)
@@ -248,6 +285,11 @@ struct PlayingVideoView: View {
     @Binding var following: Set<String>
     var body: some View {
         VStack {
+            HStack{
+                Spacer()
+                Image(systemName: premadeVideos.contains(video) ? "person.crop.circle" : "apple.intelligence")
+                    .font(.largeTitle)
+            }
             Spacer()
             Text(video.text)
                 .font(.largeTitle)
@@ -262,27 +304,30 @@ struct PlayingVideoView: View {
             if UIImage(systemName: video.image) != nil{
                 Image(systemName: video.image)
                     .font(.system(size: 100))
+            }else if video.emoji.count == 1{
+                Text(video.emoji)
+                    .font(.system(size: 100))
             }else{
                 Image(systemName: "video")
                     .font(.system(size: 100))
             }
             Spacer()
-            VStack(alignment: .leading){
-                HStack{
+            HStack{
+                VStack(alignment: .leading){
                     Text(video.creator)
                         .bold()
-//                    if !following.contains(video.creator){
-//                        Button("Follow"){
-//                            following.insert(video.creator)
-//                            print("follow")
-//                        }
-//                        .padding(5)
-//                        .glassEffect(.clear)
-//                    }
+                    Text(video.caption)
+                    HStack{
+                        ForEach(Array(video.tags), id: \.self){tag in
+                            Text("#\(tag)")
+                                .bold()
+                        }
+                    }
+                    
                 }
-                Text(video.caption)
-                Text(video.tags.joined(separator: ", "))
+                Spacer()
             }
+            .padding(.horizontal, 50)
         }
         .foregroundStyle(.white)
         .padding()
@@ -290,7 +335,7 @@ struct PlayingVideoView: View {
 }
 #Preview {
     @Previewable @State var following: Set<String> = []
-    PlayingVideoView(video: Video(caption: "", tags: [], text: "", image: "", creator: ""), following: $following)
+    PlayingVideoView(video: Video(caption: "ok blacked out like a phantom aaaaaa", tags: ["tuff","timothy"], text: "", image: "", creator: "esdcard"), following: $following)
         .frame(width: 500)
         .background(Color.accentColor)
         .mask{
