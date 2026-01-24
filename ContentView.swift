@@ -1,5 +1,6 @@
 import SwiftUI
 import FoundationModels
+import TipKit
 
 let tags: Set<String> = ["animals","news","learning","entertainment","food","podcasts","fitness","funny","gaming","reaction","sports","cars","health","dance","fashion","tech"]
 
@@ -9,32 +10,50 @@ struct ContentView: View {
     @State private var scale: CGFloat = 1.0
     @AppStorage("autoscroll") var autoscroll = false
     @State private var zoomOut = true
+    @State private var endingText = ""
+    @State private var opacity = 1.0
     var body: some View {
         if done {
-            ZStack{
-                Color(red: 52/255, green: 52/255, blue: 52/255)
-                    .ignoresSafeArea()
-                    .mask{
-                        RoundedRectangle(cornerRadius: 35)
-                            .ignoresSafeArea()
-                    }
-                    .shadow(color: .white, radius: 100)
-                    .scaleEffect(scale*1.01)
-                AppView(likedTags: $likedTags)
-                    .mask{
-                        RoundedRectangle(cornerRadius: 30)
-                            .ignoresSafeArea()
-                    }
-                    .scaleEffect(scale)
-                    .onChange(of: autoscroll) { oldValue, newValue in
-                        if newValue{
-                            zoomOut = false
-                            withAnimation(.linear(duration: 30)) {
-                                scale = 0.5
+            if opacity == 1.0{
+                ZStack{
+                    Color(red: 52/255, green: 52/255, blue: 52/255)
+                        .mask{
+                            RoundedRectangle(cornerRadius: 35)
+                                .ignoresSafeArea()
+                        }
+                        .shadow(color: .white, radius: 100)
+                        .scaleEffect(scale*1.01)
+                    AppView(likedTags: $likedTags)
+                        .mask{
+                            RoundedRectangle(cornerRadius: 30)
+                                .ignoresSafeArea()
+                        }
+                        .scaleEffect(scale)
+                        .onChange(of: autoscroll) { oldValue, newValue in
+                            //                        .onAppear(){
+                            if newValue{
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                    zoomOut = false
+                                    withAnimation(.linear(duration: 15)) {
+                                        scale = 0.5
+                                    }
+                                    withAnimation(.linear.delay(15)) {
+                                        endingText = "The Bad Ending"
+                                    }
+                                    withAnimation(.linear.delay(20)) {
+                                        opacity = 0.0
+                                    }
+                                }
                             }
                         }
+                        .allowsHitTesting(zoomOut)
+                    if !endingText.isEmpty{
+                        Text(endingText)
+                            .font(.custom("HelveticaNeue-bold", size: 100))
                     }
-                    .allowsHitTesting(zoomOut)
+                }
+            } else {
+                EndingView()
             }
             
         }else{
@@ -55,10 +74,11 @@ extension Text{
 struct WelcomeView: View {
     @Binding var likedTags: Set<String>
     @Binding var done: Bool
-    @Environment(\.colorScheme) var colorScheme
     @State private var next = false
     @State private var showAlert = false
     @State private var alertMessage: String = ""
+    @AppStorage("autoscroll") var autoscroll = false
+    @AppStorage("hasStore") var store = false
     var body: some View {
         VStack{
             Text("Welcome to Scrollify")
@@ -82,7 +102,7 @@ struct WelcomeView: View {
                         .bold()
                         .padding(10)
                         .glassEffect(likedTags.contains(tag) ? .regular.tint(.accentColor) : .regular)
-                        .foregroundStyle(colorScheme == .light && !likedTags.contains(tag) ? .black : .white)
+                        .foregroundStyle(.white)
                         .padding(5)
                         
                     }
@@ -107,6 +127,8 @@ struct WelcomeView: View {
                 IntroView(image: "heart", title: "Liking", description: "Like a video to see more posts like it. Liking it also gives you more points when a video similar to it appears.")
                 Button("Start"){
                     done = true
+                    store = false
+                    autoscroll = false
                     let model = SystemLanguageModel.default
                     switch model.availability {
                     case .available:
@@ -125,13 +147,7 @@ struct WelcomeView: View {
                         }
                     }
                 }
-                .padding()
-                .background(Color.accentColor)
-                .foregroundStyle(.white)
-                .bold()
-                .mask{
-                    RoundedRectangle(cornerRadius: 10)
-                }
+                .actionButton()
                 .alert(alertMessage, isPresented: $showAlert) {} message: {
                     Text("Apple Intelligence is recommended for the best experience.")
                 }
@@ -143,6 +159,7 @@ struct IntroView: View {
     var image: String
     var title: String
     var description: String
+    var custom = false
     var body: some View {
         HStack{
             Image(systemName: image)
@@ -152,10 +169,18 @@ struct IntroView: View {
                 .padding(10)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading){
-                Text(title)
-                    .bold()
+                if custom{
+                    Text(title)
+                        .font(.custom("HelveticaNeue-bold", size: 21))
+                }else{
+                    Text(title)
+                        .bold()
+                }
                 Text(description)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer()
         }
     }
 }
@@ -338,8 +363,8 @@ struct AppView: View{
                 Text(lastMessage.0 + ": " + lastMessage.1.text)
             }
         }
-        .onChange(of: store) { oldValue, newValue in
-            if newValue{
+        .onChange(of: store) {
+            if store{
                 storeAlert = true
             }
         }
@@ -350,8 +375,10 @@ struct AppView: View{
         } message: {
             Text("Store has been added! Spend your dopamine points on cool new items!")
         }
-        .onChange(of: autoscroll) { oldValue, newValue in
-            if newValue{
+        .onChange(of: autoscroll) {
+            print("auto changed")
+            if autoscroll{
+                print("auto true")
                 autoscrollAlert = true
             }
         }
@@ -362,5 +389,111 @@ struct AppView: View{
         } message: {
             Text("You have unlocked autoscrolling, try it out now!")
         }
+    }
+}
+struct EndingView: View {
+    @State private var page = 7
+    var body: some View {
+        VStack{
+            switch page{
+            case 1:
+                Text("Social media is more widespread than ever. ")
+                IntroView(image: "chart.pie.fill", title: "Global Users", description: "Over 4.7 billion people worldwide are active social media users.", custom: true)
+                IntroView(image: "chart.dots.scatter", title: "Average Usage", description: "The average person spends around 2 hours per day on social media globally.", custom: true)
+                Text("This is especially true amongst teenagers, where:")
+                IntroView(image: "chart.bar.xaxis", title: "In the US", description: "Teens often exceed 3–4+ hours per day. ", custom: true)
+                Text("That’s about the same as a full day’s worth of time every week.")
+                Button("Next"){
+                    withAnimation {
+                        page += 1
+                    }
+                }
+                .actionButton()
+            case 2:
+                Text("Social media addiction isn't something new. However, short-form video platforms have made it even more addictive.")
+                IntroView(image: "play.square.stack.fill", title: "Social Media Algorithms", description: "Give you a calculated, never-ending stream of posts you are guaranteed to like, making it especially hard to put down your device.", custom: true)
+                IntroView(image: "chart.pie.fill", title: "Teenage Addiction", description: "One in two teenagers report feeling “addicted” to social media.", custom: true)
+                Button("Next"){
+                    withAnimation {
+                        page += 1
+                    }
+                }
+                .actionButton()
+            case 3:
+                Text("Social media addiction comes with many drawbacks. It causes you to spend less time:")
+                IntroView(image: "person.3.fill", title: "With people who matter", description: "Family, friends, relationships that aren't parasocial", custom: true)
+                IntroView(image: "chart.pie.fill", title: "Doing things that matter", description: "Work, passions, things that are productive", custom: true)
+                IntroView(image: "person.crop.circle.fill", title: "For yourself", description: "Exercising, reflecting, giving yourself a true break", custom: true)
+                Button("Next"){
+                    withAnimation {
+                        page += 1
+                    }
+                }
+                .actionButton()
+            case 5:
+                Text("Excessive screen time can lead to:")
+                IntroView(image: "eye.trianglebadge.exclamationmark.fill", title: "Eye strain", description: "Constantly staring at a screen is bad for your eyes and can lead to things like headaches and blurred vision.", custom: true)
+                IntroView(image: "bed.double.fill", title: "Sleep deprivation", description: "When you scroll at night, the bright light from your phone makes it harder to sleep.", custom: true)
+                IntroView(image: "brain.fill", title: "Decreased attention span", description: "The short-form nature of the videos where creators try to fit as much content as possible causes you to not be able to concentrate as well on other things.", custom: true)
+                Button("Next"){
+                    withAnimation {
+                        page += 1
+                    }
+                }
+                .actionButton()
+            case 4:
+                Text("I used to be addicted to social media too. Some of the symptoms include, but are not limited to:")
+                IntroView(image: "iphone.and.arrow.right.inward", title: "Opening the app instinctively", description: "Unconsicously opening the app whenever you have time (or don't)", custom: true)
+                IntroView(image: "arrow.turn.up.forward.iphone.fill", title: "Reopening the app", description: "Going back to the app right when you close it, sometimes repeatedly", custom: true)
+                IntroView(image: "clock.fill", title: "Spending more time than you want to on it", description: "Thinking to yourself 'I'll just watch for a few minutes', then hours pass", custom: true)
+                IntroView(image: "brain.fill", title: "Thinking about it all the time", description: "Not being able to concentrate on anything else", custom: true)
+                Button("Next"){
+                    withAnimation {
+                        page += 1
+                    }
+                }
+                .actionButton()
+            case 6:
+                Text("Don’t get me wrong – I'm not saying we should stop using social media entirely – it definitely has its benefits. But it's easy to get into the wrong corners of the internet.")
+                IntroView(image: "exclamationmark.triangle.text.page.fill", title: "Fake news", description: "Misinformation meant to mislead people into thinking it's real", custom: true)
+                IntroView(image: "person.badge.shield.exclamationmark.fill", title: "Hate speech", description: "Videos or posts that spread hatred or discrimination against any group of people", custom: true)
+                IntroView(image: "person.crop.circle.dashed", title: "Echo chambers", description: "The algorithm feeds your beliefs, making you engage more with the content, in a never-ending feedback loop", custom: true)
+                Button("Next"){
+                    withAnimation {
+                        page += 1
+                    }
+                }
+                .actionButton()
+            case 7:
+                Text("If you think you’re addicted, here are some ways to stop:")
+                IntroView(image: "lock.iphone", title: "Set screen time limits", description: "Even better if you can get someone else to set a passcode (parents, relatives, friends)", custom: true)
+                IntroView(image: "powersleep", title: "Have a downtime", description: "So that you don't do it as the first or last thing you do in a day", custom: true)
+                IntroView(image: "trash.fill", title: "Delete the app entirely", description: "Works surprisingly well, from personal experience", custom: true)
+                Button("Go to Screen Time"){
+                    
+                }
+                .actionButton()
+            default:
+                Text("wait im not done with this yet")
+            }
+        }
+        .font(.custom("Chalkduster", size: 18))
+        .frame(maxWidth: 400)
+    }
+}
+#Preview {
+    EndingView()
+        .preferredColorScheme(.dark)
+}
+extension Button{
+    func actionButton() -> some View {
+        self
+            .padding()
+            .background(Color.accentColor)
+            .foregroundStyle(.white)
+            .bold()
+            .mask{
+                RoundedRectangle(cornerRadius: 10)
+            }
     }
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import FoundationModels
+import TipKit
 
 struct FeedView: View {
     @State private var currentIndex = 0
@@ -17,6 +18,10 @@ struct FeedView: View {
     @State private var isAutoscrolling = false
     @State private var timer: Timer?
     @State private var lastAutoscroll = false
+    @State var tips = TipGroup(.ordered) {
+            LikeTip()
+            FollowTip()
+        }
     var body: some View {
         GeometryReader { geometry in
             NavigationStack{
@@ -31,20 +36,20 @@ struct FeedView: View {
                                     }
                                 }label: {
                                     Image(systemName: "chevron.up")
+                                        .frame(width: 50, height: 50)
+                                        .glassEffect(.regular)
                                 }
-                                .frame(width: 50, height: 50)
-                                .glassEffect(.regular)
                                 if autoscroll{
                                     Button{
                                         isAutoscrolling.toggle()
                                     }label: {
                                         Image(systemName: isAutoscrolling ? "pause.fill" : "play.fill")
+                                            .frame(width: 50, height: 50)
+                                            .glassEffect(.regular)
                                     }
                                     .contentTransition(.symbolEffect(.replace))
-                                    .frame(width: 50, height: 50)
-                                    .glassEffect(.regular)
-                                    .onChange(of: isAutoscrolling) { oldValue, newValue in
-                                        if newValue{
+                                    .onChange(of: isAutoscrolling) {
+                                        if isAutoscrolling{
                                             timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
                                                 Task { @MainActor in
                                                     if currentIndex < feed.count - 1 {
@@ -52,7 +57,7 @@ struct FeedView: View {
                                                     }
                                                 }
                                             }
-
+                                            
                                         }else{
                                             timer?.invalidate()
                                         }
@@ -70,9 +75,9 @@ struct FeedView: View {
                                     }
                                 }label: {
                                     Image(systemName: "chevron.down")
+                                        .frame(width: 50, height: 50)
+                                        .glassEffect(.regular)
                                 }
-                                .frame(width: 50, height: 50)
-                                .glassEffect(.regular)
                             }
                             
                             ZStack{
@@ -93,16 +98,16 @@ struct FeedView: View {
                                         .offset(y: currentOffset)
                                         
                                     }
-                                    .onChange(of: currentIndex) { oldValue, newValue in
-                                        if newValue + 1 >= feed.count{
+                                    .onChange(of: currentIndex) {
+                                        if currentIndex + 1 >= feed.count{
                                             if let nextVideo = videos.rankedVideos(likedTags: likedTags).filter({!feed.contains($0)}).first{
                                                 feed.append(nextVideo)
                                             }else{
                                                 print("touch grass")
                                             }
                                         }
-                                        if newValue>lastIndex{
-                                            lastIndex = newValue
+                                        if currentIndex>lastIndex{
+                                            lastIndex = currentIndex
                                             lastScore = 0
                                             for tag in feed[currentIndex].tags{
                                                 if likedTags.subtracting(additionalTags).contains(tag){
@@ -111,6 +116,9 @@ struct FeedView: View {
                                                         lastScore+=1
                                                     }
                                                 }
+                                            }
+                                            if following.contains(feed[currentIndex].creator){
+                                                score += 1
                                             }
                                             Task{
                                                 do{
@@ -134,7 +142,7 @@ struct FeedView: View {
                                             }
                                         }
                                         withAnimation {
-                                            proxy.scrollTo(newValue)
+                                            proxy.scrollTo(currentIndex)
                                         }
                                     }
                                 }
@@ -169,21 +177,25 @@ struct FeedView: View {
                                         ProfileView(videos: videos, name: feed[currentIndex].creator, following: $following)
                                     }label: {
                                         Image(systemName: "person.crop.circle")
+                                            .frame(width: 50, height: 50)
+                                            .glassEffect(.clear)
                                     }
-                                    .frame(width: 50, height: 50)
-                                    .glassEffect(.clear)
                                     Button{
                                         if following.contains(feed[currentIndex].creator){
                                             following.remove(feed[currentIndex].creator)
                                         }else{
                                             following.insert(feed[currentIndex].creator)
                                         }
+                                        if tips.currentTip is FollowTip{
+                                            tips.currentTip?.invalidate(reason: .actionPerformed)
+                                        }
                                     }label: {
                                         Image(systemName: following.contains(feed[currentIndex].creator) ? "checkmark" : "plus")
+                                            .frame(width: 50, height: 50)
+                                            .glassEffect(.clear)
                                     }
-                                    .frame(width: 50, height: 50)
-                                    .glassEffect(.clear)
                                     .contentTransition(.symbolEffect(.replace))
+                                    .popoverTip(tips.currentTip as? FollowTip)
                                 }
                                 .glassEffect()
                                 Button{
@@ -193,11 +205,15 @@ struct FeedView: View {
                                         likedVideos.append(feed[currentIndex])
                                         likedTags.formUnion(feed[currentIndex].tags)
                                     }
+                                    if tips.currentTip is LikeTip{
+                                        tips.currentTip?.invalidate(reason: .actionPerformed)
+                                    }
                                 }label: {
                                     Image(systemName: likedVideos.contains(feed[currentIndex]) ? "heart.fill" :"heart")
+                                        .frame(width: 50, height: 50)
+                                        .glassEffect(.regular)
                                 }
-                                .frame(width: 50, height: 50)
-                                .glassEffect(.regular)
+                                .popoverTip(tips.currentTip as? LikeTip)
                             }
                             Spacer()
                         }
@@ -341,4 +357,26 @@ struct PlayingVideoView: View {
         .mask{
             RoundedRectangle(cornerRadius: 50)
         }
+}
+struct LikeTip: Tip{
+    var title: Text {
+        Text("Liking videos")
+    }
+    var message: Text? {
+        Text("Click this to see more videos like this one and be able to earn more dopamine points!")
+    }
+    var image: Image? {
+        Image(systemName: "heart")
+    }
+}
+struct FollowTip: Tip{
+    var title: Text {
+        Text("Following creators")
+    }
+    var message: Text? {
+        Text("Follow creators to see more of their videos and earn even more dopamine points!")
+    }
+    var image: Image? {
+        Image(systemName: "person.3.fill")
+    }
 }

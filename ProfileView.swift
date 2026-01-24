@@ -11,7 +11,6 @@ struct ProfileView: View {
     var videos: [Video]
     var name: String
     @Binding var following: Set<String>
-    @Environment(\.colorScheme) var colorScheme
     @State private var showAlert = false
     var body: some View {
         NavigationStack{
@@ -31,7 +30,7 @@ struct ProfileView: View {
                     .font(.title)
                     .padding()
                     .glassEffect()
-                    .foregroundStyle(colorScheme == .light ? .black : .white)
+                    .foregroundStyle(.white)
                     .padding(5)
                     .alert("Unfollow?", isPresented: $showAlert) {
                         Button("Unfollow", role: .destructive){

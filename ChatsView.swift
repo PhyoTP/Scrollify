@@ -149,8 +149,8 @@ struct ChatView: View {
                         default:
                             Color.clear
                                 .frame(height: 1)
-                                .onChange(of: chat.messages) { oldValue, newValue in
-                                    if newValue.count == 16 {
+                                .onChange(of: chat.messages) {
+                                    if chat.messages.count == 16 {
                                         store = true
                                     }
                                 }
@@ -162,8 +162,8 @@ struct ChatView: View {
                         default:
                             Color.clear
                                 .frame(height: 1)
-                                .onChange(of: chat.messages) { oldValue, newValue in
-                                    if newValue.count == 7 {
+                                .onChange(of: chat.messages) { 
+                                    if chat.messages.count == 7 {
                                         store = true
                                     }
                                 }
