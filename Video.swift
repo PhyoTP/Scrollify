@@ -133,32 +133,38 @@ func generateVideo(likedTags: Set<String>, creators: Set<String>, allVideos: [Vi
     var prompt = "You are a short-form content creator. Create a short video."
     var chosenCreator = ""
     var chosenTags = Set<String>()
+    var values = [0]
+    if likedTags.count > 5{
+        values.append(1)
+    }
     if creators.count > 5{
+        values.append(2)
+    }
+    let chosenValue = values.randomElement() ?? 0
+    switch chosenValue{
+    case 2:
         let rand = Bool.random()
         if rand{
             chosenCreator = creators.randomElement()!
             let creatorVideos = allVideos.filter{$0.creator == chosenCreator}
-            prompt = "You are a short-form content creator by the name of \(chosenCreator). You are going to make a short video. Here are some videos you have made: \(creatorVideos) Make a video similar to the videos you have been making. "
+            prompt = "You are a short-form content creator by the name of \(chosenCreator). You are going to make a short video. Here are some videos you have made: \(creatorVideos) Make a video similar to the videos you have been making. Do not make the exact same video."
         }
-    }
-//    let allCreators = Set(allVideos.map { $0.creator })
-    if likedTags.count > 5{
+    case 1:
         chosenTags = [likedTags.subtracting(additionalTags).randomElement()!]
         let rand = Bool.random()
         if rand{
             chosenTags.insert(likedTags.subtracting(additionalTags).randomElement()!)
         }
         let exampleVideos = allVideos.filter{$0.tags.contains(where: { chosenTags.contains($0) })}
-        prompt = "You are a short-form content creator. You are going to make a short video on the topic(s) of: \(chosenTags.joined(separator: ", ")). Here are some examples of videos on these topics: \(exampleVideos)"
-        
-    }else{
+        prompt = "You are a short-form content creator. You are going to make a short video on the topic(s) of: \(chosenTags.joined(separator: ", ")). Here are some examples of videos on these topics: \(exampleVideos) Do not copy the examples exactly, only follow the examples."
+    default:
         chosenTags = [tags.subtracting(additionalTags).randomElement()!]
         let rand = Bool.random()
         if rand{
             chosenTags.insert(tags.subtracting(additionalTags).randomElement()!)
         }
         let exampleVideos = allVideos.filter{$0.tags.contains(where: { chosenTags.contains($0) })}
-        prompt = "You are a short-form content creator. You are going to make a short video on the topic(s) of: \(chosenTags.joined(separator: ", ")). Here are examples of videos on these topics: \(exampleVideos)"
+        prompt = "You are a short-form content creator. You are going to make a short video on the topic(s) of: \(chosenTags.joined(separator: ", ")). Here are examples of videos on these topics: \(exampleVideos) Do not copy the examples exactly, only follow the examples."
     }
     let session = LanguageModelSession()
     var generatedVideo = try await session.respond(to: prompt, generating: Video.self).content

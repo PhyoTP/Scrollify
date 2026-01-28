@@ -98,6 +98,7 @@ struct FeedView: View {
                                         .offset(y: currentOffset)
                                         
                                     }
+                                    .scrollIndicators(.hidden)
                                     .onChange(of: currentIndex) {
                                         if currentIndex + 1 >= feed.count{
                                             if let nextVideo = videos.rankedVideos(likedTags: likedTags).filter({!feed.contains($0)}).first{
@@ -119,6 +120,12 @@ struct FeedView: View {
                                             }
                                             if following.contains(feed[currentIndex].creator){
                                                 score += 1
+                                            }
+                                            if lastIndex == 10{
+                                                score += 5
+                                                withAnimation {
+                                                    lastScore+=5
+                                                }
                                             }
                                             Task{
                                                 do{
@@ -172,38 +179,45 @@ struct FeedView: View {
                                         })
                             }
                             VStack{
-                                VStack{
-                                    NavigationLink{
-                                        ProfileView(videos: videos, name: feed[currentIndex].creator, following: $following)
-                                    }label: {
-                                        Image(systemName: "person.crop.circle")
-                                            .frame(width: 50, height: 50)
-                                            .glassEffect(.clear)
-                                    }
-                                    Button{
-                                        if following.contains(feed[currentIndex].creator){
-                                            following.remove(feed[currentIndex].creator)
-                                        }else{
-                                            following.insert(feed[currentIndex].creator)
+                                GlassEffectContainer(spacing: 30){
+                                    VStack{
+                                        NavigationLink{
+                                            ProfileView(videos: videos, name: feed[currentIndex].creator, following: $following)
+                                        }label: {
+                                            Image(systemName: "person.crop.circle")
+                                                .frame(width: 50, height: 50)
+                                                .glassEffect(.regular.interactive())
                                         }
-                                        if tips.currentTip is FollowTip{
-                                            tips.currentTip?.invalidate(reason: .actionPerformed)
+                                        Button{
+                                            if following.contains(feed[currentIndex].creator){
+                                                following.remove(feed[currentIndex].creator)
+                                            }else{
+                                                following.insert(feed[currentIndex].creator)
+                                            }
+                                            if tips.currentTip is FollowTip{
+                                                tips.currentTip?.invalidate(reason: .actionPerformed)
+                                            }
+                                        }label: {
+                                            Image(systemName: following.contains(feed[currentIndex].creator) ? "checkmark" : "plus")
+                                                .frame(width: 50, height: 50)
+                                                .glassEffect(.regular.interactive())
                                         }
-                                    }label: {
-                                        Image(systemName: following.contains(feed[currentIndex].creator) ? "checkmark" : "plus")
-                                            .frame(width: 50, height: 50)
-                                            .glassEffect(.clear)
+                                        .contentTransition(.symbolEffect(.replace))
+                                        .popoverTip(tips.currentTip as? FollowTip)
                                     }
-                                    .contentTransition(.symbolEffect(.replace))
-                                    .popoverTip(tips.currentTip as? FollowTip)
                                 }
-                                .glassEffect()
                                 Button{
                                     if likedVideos.contains(feed[currentIndex]){
                                         likedVideos.removeAll(where: {$0 == feed[currentIndex]})
                                     }else{
                                         likedVideos.append(feed[currentIndex])
                                         likedTags.formUnion(feed[currentIndex].tags)
+                                        if likedVideos.count == 5{
+                                            score += 5
+                                            withAnimation {
+                                                lastScore+=5
+                                            }
+                                        }
                                     }
                                     if tips.currentTip is LikeTip{
                                         tips.currentTip?.invalidate(reason: .actionPerformed)
@@ -211,13 +225,27 @@ struct FeedView: View {
                                 }label: {
                                     Image(systemName: likedVideos.contains(feed[currentIndex]) ? "heart.fill" :"heart")
                                         .frame(width: 50, height: 50)
-                                        .glassEffect(.regular)
+                                        .glassEffect(.regular.interactive())
                                 }
                                 .popoverTip(tips.currentTip as? LikeTip)
                             }
                             Spacer()
                         }
                         HStack{
+                            VStack{
+                                VStack{
+                                    Text("Tasks")
+                                        .font(.largeTitle.bold())
+                                    TaskView(name: "Watch 10 videos", value: lastIndex, total: 10.0, image: "eye", points: 5, score: $score)
+                                    TaskView(name: "Like 5 videos", value: likedVideos.count, total: 5.0, image: "heart", points: 5, score: $score)
+                                    TaskView(name: "Follow 5 creators", value: following.count, total: 3.0, image: "person.badge.plus", points: 10, score: $score)
+                                    
+                                }
+                                .frame(width: 200)
+                                .padding()
+                                .glassEffect(in: .rect(cornerRadius: 25))
+                                Spacer()
+                            }
                             Spacer()
                             VStack{
                                 HStack{
@@ -227,20 +255,19 @@ struct FeedView: View {
                                 .bold()
                                 .padding(10)
                                 .glassEffect(.regular)
-                                .padding(.horizontal)
-                                if lastScore != 0{
-                                    Text("+\(lastScore)")
-                                        .foregroundStyle(.green)
-                                        .onAppear(){
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                                                withAnimation(.easeOut(duration: 0.3)) {
-                                                    lastScore = 0
-                                                }
+                                Text("\(lastScore>0 ? "+" : "-")\(lastScore)")
+                                    .foregroundStyle(lastScore > 0 ? .green : lastScore < 0 ? .red : .clear)
+                                    .onAppear(){
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                                            withAnimation(.easeOut(duration: 0.3)) {
+                                                lastScore = 0
                                             }
                                         }
-                                }
+                                    }
+                                
                                 Spacer()
                             }
+                            .padding(.horizontal)
                         }
                     }
                 }else{
@@ -378,5 +405,41 @@ struct FollowTip: Tip{
     }
     var image: Image? {
         Image(systemName: "person.3.fill")
+    }
+}
+struct TaskView: View{
+    var name: String
+    var value: Int
+    var total: Double
+    var image: String
+    var points: Int
+    @Binding var score: Int
+    @State private var opacity = 1.0
+    @State private var animatedScore = 0.0
+    var body: some View{
+        if opacity == 1.0{
+            ProgressView(value: animatedScore, total: total){
+                HStack{
+                    Image(systemName: image)
+                    Text("\(name)")
+                    Spacer()
+                    Text("\(points)")
+                    Image(systemName: "face.smiling")
+                }
+            }
+            .tint(Double(value) >= total ? .green : .accentColor)
+            .onChange(of: value){
+                withAnimation(.easeOut) {
+                    animatedScore = Double(value)
+                }
+                if value == Int(total){
+                    withAnimation(.linear.delay(1)) {
+                        opacity = 0.0
+                    }
+                }
+            }
+            .opacity(opacity)
+            
+        }
     }
 }

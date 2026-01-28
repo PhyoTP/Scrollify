@@ -12,50 +12,62 @@ struct ContentView: View {
     @State private var zoomOut = true
     @State private var endingText = ""
     @State private var opacity = 1.0
+    @State private var back = false
+    @State private var tabSelection = "feed"
     var body: some View {
         if done {
-            if opacity == 1.0{
-                ZStack{
-                    Color(red: 52/255, green: 52/255, blue: 52/255)
-                        .mask{
-                            RoundedRectangle(cornerRadius: 35)
-                                .ignoresSafeArea()
-                        }
-                        .shadow(color: .white, radius: 100)
-                        .scaleEffect(scale*1.01)
-                    AppView(likedTags: $likedTags)
-                        .mask{
-                            RoundedRectangle(cornerRadius: 30)
-                                .ignoresSafeArea()
-                        }
-                        .scaleEffect(scale)
-                        .onChange(of: autoscroll) { oldValue, newValue in
-                            //                        .onAppear(){
-                            if newValue{
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                                    zoomOut = false
-                                    withAnimation(.linear(duration: 15)) {
-                                        scale = 0.5
-                                    }
-                                    withAnimation(.linear.delay(15)) {
-                                        endingText = "The Bad Ending"
-                                    }
-                                    withAnimation(.linear.delay(20)) {
-                                        opacity = 0.0
+            Group{
+                if opacity == 1.0{
+                    ZStack{
+                        Color(red: 52/255, green: 52/255, blue: 52/255)
+                            .mask{
+                                RoundedRectangle(cornerRadius: 35)
+                                    .ignoresSafeArea()
+                            }
+                            .shadow(color: .white, radius: 100)
+                            .scaleEffect(scale*1.01)
+                        AppView(tabSelection: $tabSelection, likedTags: $likedTags, back: back)
+                            .mask{
+                                RoundedRectangle(cornerRadius: 30)
+                                    .ignoresSafeArea()
+                            }
+                            .scaleEffect(scale)
+                            .onChange(of: autoscroll) { oldValue, newValue in
+                                //                        .onAppear(){
+                                if newValue{
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                        zoomOut = false
+                                        withAnimation(.linear(duration: 15)) {
+                                            scale = 0.5
+                                        }
+                                        withAnimation(.linear.delay(15)) {
+                                            endingText = "The Bad Ending"
+                                        }
+                                        withAnimation(.linear.delay(20)) {
+                                            opacity = 0.0
+                                        }
                                     }
                                 }
                             }
+                            .allowsHitTesting(zoomOut)
+                        if !endingText.isEmpty{
+                            Text(endingText)
+                                .font(.custom("HelveticaNeue-bold", size: 100))
                         }
-                        .allowsHitTesting(zoomOut)
-                    if !endingText.isEmpty{
-                        Text(endingText)
-                            .font(.custom("HelveticaNeue-bold", size: 100))
                     }
+                } else {
+                    EndingView(back: $back)
                 }
-            } else {
-                EndingView()
             }
-            
+            .onChange(of: back) {
+                if back{
+                    opacity = 1.0
+                    endingText = ""
+                    zoomOut = true
+                    scale = 1.0
+                    tabSelection = "screentime"
+                }
+            }
         }else{
             WelcomeView(likedTags: $likedTags, done: $done)
                 .frame(maxWidth: 400)
@@ -238,13 +250,14 @@ struct AppView: View{
     ]
     @State private var newMessages: [(String, Message)] = []
     @State private var newMessageAlert = false
-    @State private var tabSelection = "feed"
+    @Binding var tabSelection: String
     @AppStorage("hasStore") var store = false
     @State private var storeAlert = false
     @State private var score = 0
     @AppStorage("autoscroll") var autoscroll = false
     @Binding var likedTags: Set<String>
     @State private var autoscrollAlert = false
+    var back: Bool
     var body: some View{
         TabView(selection: $tabSelection){
             Tab(value: "feed"){
@@ -268,9 +281,15 @@ struct AppView: View{
             Tab(value: "debug"){ // MUST DELETE
                 Toggle("has store", isOn: $store)
                 Toggle("has autoscroll", isOn: $autoscroll)
-                
             }label: {
                 Label("Debug", systemImage: "arrow.2.circlepath.circle")
+            }
+            if back{
+                Tab(value: "screentime"){
+                    ScreenTimeView()
+                }label: {
+                    Label("Screen Time", image: "hourglass")
+                }
             }
             Tab(value: "search", role: .search) {
                 
@@ -392,7 +411,8 @@ struct AppView: View{
     }
 }
 struct EndingView: View {
-    @State private var page = 7
+    @State private var page = 1
+    @Binding var back: Bool
     var body: some View {
         VStack{
             switch page{
@@ -466,11 +486,11 @@ struct EndingView: View {
                 .actionButton()
             case 7:
                 Text("If you think you’re addicted, here are some ways to stop:")
-                IntroView(image: "lock.iphone", title: "Set screen time limits", description: "Even better if you can get someone else to set a passcode (parents, relatives, friends)", custom: true)
+                IntroView(image: "hourglass", title: "Set screen time limits", description: "Even better if you can get someone else to set a passcode (parents, relatives, friends)", custom: true)
                 IntroView(image: "powersleep", title: "Have a downtime", description: "So that you don't do it as the first or last thing you do in a day", custom: true)
                 IntroView(image: "trash.fill", title: "Delete the app entirely", description: "Works surprisingly well, from personal experience", custom: true)
                 Button("Go to Screen Time"){
-                    
+                    back = true
                 }
                 .actionButton()
             default:
@@ -481,10 +501,10 @@ struct EndingView: View {
         .frame(maxWidth: 400)
     }
 }
-#Preview {
-    EndingView()
-        .preferredColorScheme(.dark)
-}
+//#Preview {
+//    EndingView()
+//        .preferredColorScheme(.dark)
+//}
 extension Button{
     func actionButton() -> some View {
         self
