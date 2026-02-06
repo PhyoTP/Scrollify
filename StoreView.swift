@@ -9,9 +9,9 @@ import SwiftUI
 
 struct StoreView: View {
     let storeItems = [StoreItem(name: "Autoscroll", description: "Let us do the scrolling for you!", cost: 30, image: "rectangle.stack.badge.play")]
-    @Binding var score: Int
-    @AppStorage("autoscroll") var autoscroll = false
+    @Environment(DataManager.self) var dataManager
     var body: some View {
+        @Bindable var dataManager = dataManager
         NavigationStack {
             ScrollView(.vertical) {
                 LazyVGrid(columns: [GridItem(.flexible()),GridItem(.flexible()),GridItem(.flexible())]){
@@ -28,21 +28,21 @@ struct StoreView: View {
                                 .font(.title)
                             Text(item.description)
                             Button{
-                                autoscroll = true
+                                dataManager.autoscroll = true
                             }label: {
                                 HStack{
                                     Image(systemName: "face.smiling")
-                                    Text(autoscroll ? "Bought!" : String(item.cost))
+                                    Text(dataManager.autoscroll ? "Bought!" : String(item.cost))
                                 }
                             }
                             .padding()
-                            .background(score < item.cost || autoscroll ? Color.gray:Color.accentColor)
+                            .background(dataManager.score < item.cost || dataManager.autoscroll ? Color.gray:Color.accentColor)
                             .foregroundStyle(.white)
                             .bold()
                             .mask{
                                 RoundedRectangle(cornerRadius: 10)
                             }
-                            .disabled(score < item.cost || autoscroll)
+                            .disabled(dataManager.score < item.cost || dataManager.autoscroll)
                         }
                         .frame(width: 300, height: 300)
                         .background(Color.primary.opacity(0.1))
@@ -56,7 +56,7 @@ struct StoreView: View {
                 ToolbarItem(placement: .topBarTrailing){
                     HStack{
                         Image(systemName: "face.smiling")
-                        Text("\(score)")
+                        Text("\(dataManager.score)")
                     }
                         .bold()
                         .padding(10)
@@ -67,8 +67,7 @@ struct StoreView: View {
 }
 
 #Preview {
-    @Previewable @State var score = 100
-    StoreView(score: $score)
+    StoreView()
 }
 struct StoreItem: Identifiable{
     var id = UUID()

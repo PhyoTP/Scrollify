@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct ChatsView: View {
-    @Binding var chats: [Chat]
     @State private var nicknames: [String: String] = ["bobby1479":"my best friend","danielletan73":"Mom"]
-    @Binding var newMessages: [(String, Message)]
+    @Environment(DataManager.self) var dataManager
     var body: some View {
+        @Bindable var dataManager = dataManager
         NavigationStack {
-            List($chats, id: \.user) { $chat in
-                NavigationLink(destination: ChatView(chat: $chat, newMessages: $newMessages)) {
+            List($dataManager.chats, id: \.user) { $chat in
+                NavigationLink(destination: ChatView(chat: $chat)) {
                     HStack{
                         Image(systemName: "person.crop.circle.fill")
                             .foregroundStyle(Color.accentColor)
@@ -26,7 +26,7 @@ struct ChatsView: View {
                             Text(chat.messages.last != nil ? (chat.messages.last!.isMe ? "You: \(chat.messages.last!.text)" : "\(chat.user): \(chat.messages.last!.text)") : "No messages")
                         }
                         Spacer()
-                        let count = newMessages.count(where: {$0.0 == chat.user})
+                        let count = dataManager.newMessages.count(where: {$0.0 == chat.user})
                         if count != 0{
                             Text(String(count))
                                 .padding()
@@ -45,27 +45,19 @@ struct ChatsView: View {
 }
 let lastMessageForPreview = Message(isMe: false, text: "Son")
 #Preview {
-    @Previewable @State var chats: [Chat] = [
-        Chat(user: "bobby1479", messages: [
-            Message(isMe: true, text: "wsg"),
-            Message(isMe: false, text: "hii"),
-            Message(isMe: true, text: "how you doin"),
-            Message(isMe: false, text: "fine hbu"),
-            Message(isMe: true, text: "pretty chill")
-        ]),
-        Chat(user: "danielletan73", messages: [lastMessageForPreview])
-    ]
-    @Previewable @State var newMessages: [(String, Message)] = [("danielletan79", lastMessageForPreview)]
-    ChatsView(chats: $chats, newMessages: $newMessages)
+    ChatsView()
         .preferredColorScheme(.dark)
+        .environment(DataManager())
 }
 struct ChatView: View {
     @Binding var chat: Chat
-    @Binding var newMessages: [(String, Message)]
     @State private var localNewMessages = [(String, Message)]()
     @State private var typing = false
-    @AppStorage("hasStore") var store = false
+    @Environment(DataManager.self) var dataManager
+    @State private var time = Date.distantFuture
+    @State private var canMeet = false
     var body: some View {
+        @Bindable var dataManager = dataManager
         NavigationStack{
             VStack{
                 ScrollViewReader{ proxy in
@@ -119,8 +111,8 @@ struct ChatView: View {
                         .padding()
                         .navigationTitle(chat.user)
                         .onAppear(){
-                            localNewMessages = newMessages.filter({$0.0 == chat.user})
-                            newMessages.removeAll(where: {$0.0 == chat.user})
+                            localNewMessages = dataManager.newMessages.filter({$0.0 == chat.user})
+                            dataManager.newMessages.removeAll(where: {$0.0 == chat.user})
                         }
                     }
                     .onAppear(){
@@ -130,6 +122,7 @@ struct ChatView: View {
                 if let lastText = chat.messages.last?.text{
                     switch chat.user{
                     case "bobby1479":
+                        
                         switch lastText{
                         case "yo bro":
                             TextButton(text: "What's up", messages: $chat.messages, typing: $typing, next: ["you wanna go bowling with us later?"])
@@ -146,14 +139,44 @@ struct ChatView: View {
                                 TextButton(text: "sorry", messages: $chat.messages, typing: $typing, next: ["you're always on your phone"])
                                 TextButton(text: "I'm just really busy", messages: $chat.messages, typing: $typing, next: ["that's what you always say"])
                             }
+                        case "Yeah I see you":
+                                Color.clear
+                                    .frame(height: 1)
+                                    .onAppear(){
+                                        if let bowlIndex = dataManager.tasks.firstIndex(where: {$0.name == "bowlingmeet"}), !dataManager.tasks.contains(where: {$0.name == "bowlingmain"}){
+                                            dataManager.tasks[bowlIndex].done = true
+                                            dataManager.tasks.append(ATask(name: "bowlingmain", title: "Bowl without scrolling", image: "figure.bowling", points: 10))
+                                        }
+                                    }
+                        case "alr then see you in 30":
+                            if canMeet{
+                                TextButton(text: "Yo I'm here", messages: $chat.messages, typing: $typing, next: ["Yeah I see you"])
+                            }
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear(){
+                                    if !dataManager.tasks.contains(where: {$0.name == "bowlingmeet"}){
+                                        dataManager.tasks.append(ATask(name: "bowlingmeet", title: "Go bowling in 30 (seconds)", image: "figure.bowling", points: 5))
+                                        time = Date.now
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0){
+                                            canMeet = true
+                                        }
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 45.0){
+                                            canMeet = false
+                                            if chat.messages.last?.text != "Yeah I see you"{
+                                                chat.messages.append(Message(isMe: false, text: "bro u here yet"))
+                                            }
+                                        }
+                                    }
+                                }
                         default:
                             Color.clear
                                 .frame(height: 1)
-                                .onChange(of: chat.messages) {
-                                    if chat.messages.count == 16 {
-                                        store = true
-                                    }
-                                }
+//                                .onChange(of: chat.messages) {
+//                                    if chat.messages.count == 16 {
+//                                        dataManager.store = true
+//                                    }
+//                                }
                         }
                     case "danielletan73":
                         switch lastText{
@@ -164,7 +187,7 @@ struct ChatView: View {
                                 .frame(height: 1)
                                 .onChange(of: chat.messages) { 
                                     if chat.messages.count == 7 {
-                                        store = true
+                                        dataManager.store = true
                                     }
                                 }
                         }

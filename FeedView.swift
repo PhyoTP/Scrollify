@@ -7,14 +7,11 @@ struct FeedView: View {
     @State private var currentOffset: CGFloat = 0
     @State private var likedVideos: [Video] = []
     @State private var feed: [Video] = []
-    @Binding var likedTags: Set<String>
     @Binding var videos: [Video]
     @State private var lastIndex = 0
-    @Binding var score: Int
     @State private var lastScore = 0
     @Binding var following: Set<String>
-    @Binding var chats: [Chat]
-    @AppStorage("autoscroll") var autoscroll = false
+    @Environment(DataManager.self) var dataManager
     @State private var isAutoscrolling = false
     @State private var timer: Timer?
     @State private var lastAutoscroll = false
@@ -23,6 +20,7 @@ struct FeedView: View {
             FollowTip()
         }
     var body: some View {
+        @Bindable var dataManager = dataManager
         GeometryReader { geometry in
             NavigationStack{
                 if !feed.isEmpty{
@@ -39,7 +37,7 @@ struct FeedView: View {
                                         .frame(width: 50, height: 50)
                                         .glassEffect(.regular)
                                 }
-                                if autoscroll{
+                                if dataManager.autoscroll{
                                     Button{
                                         isAutoscrolling.toggle()
                                     }label: {
@@ -63,7 +61,7 @@ struct FeedView: View {
                                         }
                                     }
                                     .onAppear(){
-                                        if autoscroll && !lastAutoscroll{
+                                        if dataManager.autoscroll && !lastAutoscroll{
                                             isAutoscrolling = true
                                             lastAutoscroll = true
                                         }
@@ -101,7 +99,7 @@ struct FeedView: View {
                                     .scrollIndicators(.hidden)
                                     .onChange(of: currentIndex) {
                                         if currentIndex + 1 >= feed.count{
-                                            if let nextVideo = videos.rankedVideos(likedTags: likedTags).filter({!feed.contains($0)}).first{
+                                            if let nextVideo = videos.rankedVideos(likedTags: dataManager.likedTags).filter({!feed.contains($0)}).first{
                                                 feed.append(nextVideo)
                                             }else{
                                                 print("touch grass")
@@ -111,39 +109,33 @@ struct FeedView: View {
                                             lastIndex = currentIndex
                                             lastScore = 0
                                             for tag in feed[currentIndex].tags{
-                                                if likedTags.subtracting(additionalTags).contains(tag){
-                                                    score += 1
+                                                if dataManager.likedTags.subtracting(additionalTags).contains(tag){
+                                                    dataManager.score += 1
                                                     withAnimation {
                                                         lastScore+=1
                                                     }
                                                 }
                                             }
                                             if following.contains(feed[currentIndex].creator){
-                                                score += 1
-                                            }
-                                            if lastIndex == 10{
-                                                score += 5
-                                                withAnimation {
-                                                    lastScore+=5
-                                                }
+                                                dataManager.score += 1
                                             }
                                             Task{
                                                 do{
-                                                    let video = try await generateVideo(likedTags: likedTags, creators: following, allVideos: videos)
+                                                    let video = try await generateVideo(likedTags: dataManager.likedTags, creators: following, allVideos: videos)
                                                     feed.append(video)
                                                     videos.append(video)
                                                 }catch{
                                                     print(error.localizedDescription)
                                                 }
                                             }
-                                            if let friendIndex = chats.firstIndex(where: {$0.user == "bobby1479"}), let momIndex = chats.firstIndex(where: {$0.user == "danielletan73"}){
+                                            if let friendIndex = dataManager.chats.firstIndex(where: {$0.user == "bobby1479"}), let momIndex = dataManager.chats.firstIndex(where: {$0.user == "danielletan73"}){
                                                 if lastIndex == 10{
-                                                    chats[friendIndex].messages.append(Message(isMe: false, text: "yo bro"))
+                                                    dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "yo bro"))
                                                 }else if lastIndex == 20{
-                                                    if chats[friendIndex].messages.last?.text == "alr then see you in 30"{
-                                                        chats[friendIndex].messages.append(Message(isMe: false, text: "bro u here yet"))
+                                                    if dataManager.chats[friendIndex].messages.last?.text == "alr then see you in 30"{
+//                                                        dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "bro u here yet"))
                                                     }else{
-                                                        chats[momIndex].messages.append(Message(isMe: false, text: "Son"))
+                                                        dataManager.chats[momIndex].messages.append(Message(isMe: false, text: "Son"))
                                                     }
                                                 }
                                             }
@@ -211,13 +203,8 @@ struct FeedView: View {
                                         likedVideos.removeAll(where: {$0 == feed[currentIndex]})
                                     }else{
                                         likedVideos.append(feed[currentIndex])
-                                        likedTags.formUnion(feed[currentIndex].tags)
-                                        if likedVideos.count == 5{
-                                            score += 5
-                                            withAnimation {
-                                                lastScore+=5
-                                            }
-                                        }
+                                        dataManager.likedTags.formUnion(feed[currentIndex].tags)
+                                        
                                     }
                                     if tips.currentTip is LikeTip{
                                         tips.currentTip?.invalidate(reason: .actionPerformed)
@@ -234,12 +221,16 @@ struct FeedView: View {
                         HStack{
                             VStack{
                                 VStack{
+                                    let taskValues = [
+                                        "watch": lastIndex,
+                                        "like": likedVideos.count,
+                                        "follow": following.count
+                                    ]
                                     Text("Tasks")
                                         .font(.largeTitle.bold())
-                                    TaskView(name: "Watch 10 videos", value: lastIndex, total: 10.0, image: "eye", points: 5, score: $score)
-                                    TaskView(name: "Like 5 videos", value: likedVideos.count, total: 5.0, image: "heart", points: 5, score: $score)
-                                    TaskView(name: "Follow 5 creators", value: following.count, total: 3.0, image: "person.badge.plus", points: 10, score: $score)
-                                    
+                                    ForEach($dataManager.tasks, id: \.name) { $task in
+                                        TaskView(task: $task, value: taskValues[task.name] ?? (task.done ? 1 : 0), lastScore: $lastScore)
+                                    }
                                 }
                                 .frame(width: 200)
                                 .padding()
@@ -250,7 +241,7 @@ struct FeedView: View {
                             VStack{
                                 HStack{
                                     Image(systemName: "face.smiling")
-                                    Text("\(score)")
+                                    Text("\(dataManager.score)")
                                 }
                                 .bold()
                                 .padding(10)
@@ -273,10 +264,10 @@ struct FeedView: View {
                 }else{
                     Rectangle()
                         .onAppear(){
-                            feed = Array(videos.rankedVideos(likedTags: likedTags).prefix(3))
+                            feed = Array(videos.rankedVideos(likedTags: dataManager.likedTags).prefix(3))
                             for tag in feed[currentIndex].tags{
-                                if likedTags.contains(tag){
-                                    score += 1
+                                if dataManager.likedTags.contains(tag){
+                                    dataManager.score += 1
                                     lastScore+=1
                                 }
                             }
@@ -408,38 +399,49 @@ struct FollowTip: Tip{
     }
 }
 struct TaskView: View{
-    var name: String
+    @Binding var task: ATask
     var value: Int
-    var total: Double
-    var image: String
-    var points: Int
-    @Binding var score: Int
-    @State private var opacity = 1.0
-    @State private var animatedScore = 0.0
+    @State private var animatedValue = 0.0
+    @Environment(DataManager.self) var dataManager
+    @Binding var lastScore: Int
+    @State private var done = false
     var body: some View{
-        if opacity == 1.0{
-            ProgressView(value: animatedScore, total: total){
+        @Bindable var dataManager = dataManager
+        if !task.done{
+            ProgressView(value: animatedValue, total: Double(task.total)){
                 HStack{
-                    Image(systemName: image)
-                    Text("\(name)")
+                    Image(systemName: task.image)
+                    Text("\(task.title)")
                     Spacer()
-                    Text("\(points)")
+                    Text("\(task.points)")
                     Image(systemName: "face.smiling")
                 }
             }
-            .tint(Double(value) >= total ? .green : .accentColor)
+            .tint(value >= task.total ? .green : .accentColor)
             .onChange(of: value){
                 withAnimation(.easeOut) {
-                    animatedScore = Double(value)
+                    animatedValue = Double(value)
                 }
-                if value == Int(total){
+                if value == task.total && !done{
+                    done = true
+                    dataManager.score += task.points
+                    withAnimation {
+                        lastScore+=task.points
+                    }
                     withAnimation(.linear.delay(1)) {
-                        opacity = 0.0
+                        task.done = true
                     }
                 }
             }
-            .opacity(opacity)
             
         }
     }
+}
+struct ATask: Equatable{
+    var name: String
+    var title: String
+    var total: Int = 1
+    var image: String
+    var points: Int
+    var done = false
 }
