@@ -22,6 +22,10 @@ import TipKit
         ATask(name: "like", title: "Like 5 videos", total: 5, image: "heart", points: 5),
         ATask(name: "follow", title: "Follow 5 creators", total: 5, image: "person.badge.plus", points: 10)
     ]
+    var tabSelection = "feed"
+    var following: Set<String> = []
+    var videos = premadeVideos
+    var feed: [Video] = []
 }
 @main
 struct MyApp: App {

@@ -8,11 +8,11 @@
 import SwiftUI
 
 struct ProfileView: View {
-    var videos: [Video]
     var name: String
-    @Binding var following: Set<String>
+    @Environment(DataManager.self) var dataManager
     @State private var showAlert = false
     var body: some View {
+        @Bindable var dataManager = dataManager
         NavigationStack{
             VStack{
                 Image(systemName: "person.crop.circle")
@@ -23,7 +23,7 @@ struct ProfileView: View {
                 Text(name)
                     .font(.largeTitle)
                     .bold()
-                if following.contains(name){
+                if dataManager.following.contains(name){
                     Button("Following"){
                         showAlert = true
                     }
@@ -34,13 +34,13 @@ struct ProfileView: View {
                     .padding(5)
                     .alert("Unfollow?", isPresented: $showAlert) {
                         Button("Unfollow", role: .destructive){
-                            following.remove(name)
+                            dataManager.following.remove(name)
                         }
                     }
                 }else{
                     Button("Follow"){
                         withAnimation {
-                            _ = following.insert(name)
+                            _ = dataManager.following.insert(name)
                         }
                     }
                     .font(.title)
@@ -53,7 +53,7 @@ struct ProfileView: View {
                 Divider()
                 ScrollView(.vertical){
                     LazyVGrid(columns: [GridItem(.flexible()),GridItem(.flexible()),GridItem(.flexible())]){
-                        ForEach(videos.filter{$0.creator == name}){video in
+                        ForEach(dataManager.videos.filter{$0.creator == name}){video in
                             VideoView(video: video)
                                 .frame(maxWidth: .infinity)
                                 .aspectRatio(9.0/16.0, contentMode: .fit)
@@ -69,7 +69,6 @@ struct ProfileView: View {
         }
     }
 }
-#Preview {
-    @Previewable @State var following: Set<String> = []
-    ProfileView(videos: premadeVideos, name: "cutecats191", following: $following)
-}
+//#Preview {
+//    ProfileView(videos: premadeVideos, name: "cutecats191")
+//}

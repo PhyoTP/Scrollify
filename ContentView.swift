@@ -12,8 +12,8 @@ struct ContentView: View {
     @State private var endingText = ""
     @State private var opacity = 1.0
     @State private var back = false
-    @State private var tabSelection = "feed"
     var body: some View {
+        @Bindable var dataManager = dataManager
         if done {
             Group{
                 if opacity == 1.0{
@@ -25,7 +25,7 @@ struct ContentView: View {
                             }
                             .shadow(color: .white, radius: 100)
                             .scaleEffect(scale*1.01)
-                        AppView(tabSelection: $tabSelection, back: back)
+                        AppView(back: back)
                             .mask{
                                 RoundedRectangle(cornerRadius: 30)
                                     .ignoresSafeArea()
@@ -64,7 +64,7 @@ struct ContentView: View {
                     endingText = ""
                     zoomOut = true
                     scale = 1.0
-                    tabSelection = "screentime"
+                    dataManager.tabSelection = "screentime"
                 }
             }
         }else{
@@ -230,192 +230,6 @@ struct FlowLayout: Layout{
         }
     }
 }
-struct AppView: View{
-    @State private var videos = premadeVideos
-    @State private var showSheet = true
-    @State private var query = ""
-    @State private var following: Set<String> = []
-    @State private var newMessageAlert = false
-    @Binding var tabSelection: String
-    @State private var storeAlert = false
-    @Environment(DataManager.self) var dataManager
-    @State private var autoscrollAlert = false
-    var back: Bool
-    @State private var taskAlert = false
-    @State private var bowlingSheet = false
-    var body: some View{
-        @Bindable var dataManager = dataManager
-        TabView(selection: $tabSelection){
-            Tab(value: "feed"){
-                FeedView(videos: $videos, following: $following)
-            } label: {
-                Label("Feed", systemImage: "square.stack")
-            }
-            Tab(value: "chats") {
-                ChatsView()
-            } label: {
-                Label("Chats", systemImage: "bubble.left.and.bubble.right")
-            }
-            .badge(dataManager.newMessages.count)
-            if dataManager.store{
-                Tab(value: "store"){
-                    StoreView()
-                }label: {
-                    Label("Store", systemImage: "storefront")
-                }
-            }
-            Tab(value: "debug"){ // MUST DELETE
-                Toggle("has store", isOn: $dataManager.store)
-                Toggle("has autoscroll", isOn: $dataManager.autoscroll)
-            }label: {
-                Label("Debug", systemImage: "arrow.2.circlepath.circle")
-            }
-            if back{
-                Tab(value: "screentime"){
-                    ScreenTimeView()
-                }label: {
-                    Label("Screen Time", image: "hourglass")
-                }
-            }
-            Tab(value: "search", role: .search) {
-                
-                NavigationStack{
-                    if query.isEmpty{
-                        VStack{
-                            Image(systemName: "rectangle.and.pencil.and.ellipsis")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 80)
-                            Text("Search for videos, creators, tags...")
-                                .font(.title)
-                        }
-                        .foregroundStyle(.gray)
-                    }else{
-                        ScrollView(.vertical){
-                            
-                            VStack{
-                                Text("Creators").header()
-                                let filteredCreators = Set(videos.compactMap(\.creator)).sorted().filter{$0.lowercased().contains(query.lowercased())}
-                                LazyVGrid(columns: [GridItem(.flexible()),GridItem(.flexible())]){
-                                    ForEach(filteredCreators, id: \.self){creator in
-                                        NavigationLink{
-                                            ProfileView(videos: videos, name: creator, following: $following)
-                                        }label:{
-                                            HStack{
-                                                Label(creator, systemImage: "person.crop.circle")
-                                                    .padding()
-                                                Spacer()
-                                            }
-                                            .frame(maxWidth: .infinity)
-                                            .background(.quaternary)
-                                            .mask{
-                                                RoundedRectangle(cornerRadius: 10)
-                                            }
-                                        }
-                                        .padding(.horizontal)
-                                    }
-                                }
-                                Text("Videos").header()
-                                let filteredVideos = videos.filter{$0.caption.lowercased().contains(query.lowercased())||$0.text.lowercased().contains(query.lowercased())}
-                                LazyVGrid(columns: [GridItem(.flexible()),GridItem(.flexible())]){
-                                    ForEach(filteredVideos){video in
-                                        NavigationLink{
-                                            PlayingVideoView(video: video, following: $following)
-                                        }label:{
-                                            VideoView(video: video)
-                                                .frame(maxWidth: .infinity)
-                                                .aspectRatio(9.0/16.0, contentMode: .fit)
-                                                .background(Color.accentColor)
-                                                .mask{
-                                                    RoundedRectangle(cornerRadius: 50)
-                                                }
-                                        }
-                                        .padding()
-                                        
-                                    }
-                                }
-                            }
-                        }
-                        .padding()
-                    }
-                }
-                
-                .searchable(text: $query)
-            }
-        }
-        .tabViewSearchActivation(.searchTabSelection)
-        .onChange(of: dataManager.chats) { oldValue, newValue in
-            for i in newValue.indices{
-                if oldValue[i].messages.count != newValue[i].messages.count{
-                    if newValue[i].messages[oldValue[i].messages.count...].contains(where: {$0.isMe == true}){
-                        dataManager.newMessages.removeAll(where: {$0.0 == newValue[i].user})
-                    }else{
-                        dataManager.newMessages.append(contentsOf: newValue[i].messages[oldValue[i].messages.count...].map{(newValue[i].user, $0)})
-                    }
-                    if tabSelection != "chats"{
-                        newMessageAlert = true
-                    }
-                }
-            }
-            
-        }
-        .alert("New message", isPresented: $newMessageAlert) {
-            Button("Go to chats"){
-                tabSelection = "chats"
-            }
-        } message: {
-            if let lastMessage = dataManager.newMessages.last{
-                Text(lastMessage.0 + ": " + lastMessage.1.text)
-            }
-        }
-        .onChange(of: dataManager.store) {
-            if dataManager.store{
-                storeAlert = true
-            }
-        }
-        .alert("New feature!", isPresented: $storeAlert) {
-            Button("Go to store"){
-                tabSelection = "store"
-            }
-        } message: {
-            Text("Store has been added! Spend your dopamine points on cool new items!")
-        }
-        .onChange(of: dataManager.autoscroll) {
-            print("auto changed")
-            if dataManager.autoscroll{
-                print("auto true")
-                autoscrollAlert = true
-            }
-        }
-        .alert("Autoscroll unlocked!", isPresented: $autoscrollAlert) {
-            Button("Go to feed"){
-                tabSelection = "feed"
-            }
-        } message: {
-            Text("You have unlocked autoscrolling, try it out now!")
-        }
-        .onChange(of: dataManager.tasks.count){
-            DispatchQueue.main.async {
-                taskAlert = true
-            }
-        }
-        .alert("New task", isPresented: $taskAlert){
-            if let lastTask = dataManager.tasks.last, lastTask.name == "bowlingmain"{
-                Button("Go bowling"){
-                    bowlingSheet = true
-                }
-            }
-        } message: {
-            if let lastTask = dataManager.tasks.last{
-                Label(lastTask.title, systemImage: lastTask.image)
-                    .labelStyle(.titleAndIcon)
-            }
-        }
-        .sheet(isPresented: $bowlingSheet) {
-            BowlingView()
-        }
-    }
-}
 struct EndingView: View {
     @State private var page = 1
     @Binding var back: Bool
@@ -507,11 +321,11 @@ struct EndingView: View {
         .frame(maxWidth: 400)
     }
 }
-#Preview {
-    @Previewable @State var back = false
-    EndingView(back: $back)
-        .preferredColorScheme(.dark)
-}
+//#Preview {
+//    @Previewable @State var back = false
+//    EndingView(back: $back)
+//        .preferredColorScheme(.dark)
+//}
 extension Button{
     func actionButton() -> some View {
         self

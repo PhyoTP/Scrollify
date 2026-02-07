@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct BowlingView: View {
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    let timer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
     @State private var currentOffset = 0.0
     @State private var endOffset = 0.0
     @State private var startOffset: Double?
@@ -16,7 +16,13 @@ struct BowlingView: View {
     @State private var opacity = 1.0
     @State private var score = 0
     @State private var lastScore = 0
+    @Environment(\.dismiss) var dismiss
+    @Environment(DataManager.self) var dataManager
+    @State private var timeCount = 0
+    @State private var alertText = ""
+    @State private var showAlert = false
     var body: some View {
+        @Bindable var dataManager = dataManager
         GeometryReader{ geometry in
             
             VStack(spacing: 0){
@@ -135,13 +141,59 @@ struct BowlingView: View {
                 }
             }
         }
+        .onReceive(timer) { _ in
+            timeCount += 1
+            if timeCount == 1{
+                if dataManager.following.count > 0{
+                    let chosenCreator = dataManager.following.randomElement()!
+                    let prompt = creatorGeneratePrompt(for: chosenCreator, allVideos: dataManager.videos)
+                    alertText = "New video from \(chosenCreator)"
+                    Task {
+                        do{
+                            let video = try await generateVideo(prompt: prompt, chosenCreator: chosenCreator, chosenTags: Set<String>())
+                            dataManager.videos.append(video)
+                            dataManager.feed.insert(video, at: dataManager.feed.count - 2)
+                        }catch{
+                            alertText = "We found a video you might like"
+                        }
+                    }
+                }else{
+                    alertText = "We found a video you might like"
+                }
+                showAlert = true
+            }else if timeCount == 2{
+                alertText = "Come back, we have new videos!"
+                showAlert = true
+            }else{
+                if let bowlIndex = dataManager.tasks.firstIndex(where: {$0.name == "bowlingmain"}), let friendIndex = dataManager.chats.firstIndex(where: {$0.user == "bobby1479"}){
+                    dataManager.tasks[bowlIndex].done = true
+                    dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "That was fun"))
+                    dismiss()
+                }
+            }
+        }
+        .alert("New notification", isPresented: $showAlert) {
+            Button("Dismiss"){}
+            Button("Open"){
+                dataManager.tabSelection = "feed"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10){
+                    if let friendIndex = dataManager.chats.firstIndex(where: {$0.user == "bobby1479"}){
+                        dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "Bro can you get off your phone"))
+                    }
+                }
+                dismiss()
+            }
+        }message: {
+            Text(alertText)
+        }
     }
 }
 
-#Preview(traits: .landscapeLeft) {
+#Preview(traits: .portrait) {
     @Previewable @State var isPresented: Bool = true
     Rectangle()
         .sheet(isPresented: $isPresented) {
             BowlingView()
         }
+        .environment(DataManager())
 }

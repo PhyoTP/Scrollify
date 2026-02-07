@@ -6,11 +6,8 @@ struct FeedView: View {
     @State private var currentIndex = 0
     @State private var currentOffset: CGFloat = 0
     @State private var likedVideos: [Video] = []
-    @State private var feed: [Video] = []
-    @Binding var videos: [Video]
     @State private var lastIndex = 0
     @State private var lastScore = 0
-    @Binding var following: Set<String>
     @Environment(DataManager.self) var dataManager
     @State private var isAutoscrolling = false
     @State private var timer: Timer?
@@ -23,7 +20,7 @@ struct FeedView: View {
         @Bindable var dataManager = dataManager
         GeometryReader { geometry in
             NavigationStack{
-                if !feed.isEmpty{
+                if !dataManager.feed.isEmpty{
                     ZStack{
                         HStack{
                             Spacer()
@@ -35,22 +32,24 @@ struct FeedView: View {
                                 }label: {
                                     Image(systemName: "chevron.up")
                                         .frame(width: 50, height: 50)
-                                        .glassEffect(.regular)
+                                        .glassEffect(.regular.interactive())
                                 }
+                                .disabled(currentIndex == 0)
+                                .foregroundStyle(currentIndex == 0 ? .gray : Color.accentColor)
                                 if dataManager.autoscroll{
                                     Button{
                                         isAutoscrolling.toggle()
                                     }label: {
                                         Image(systemName: isAutoscrolling ? "pause.fill" : "play.fill")
                                             .frame(width: 50, height: 50)
-                                            .glassEffect(.regular)
+                                            .glassEffect(.regular.interactive())
                                     }
                                     .contentTransition(.symbolEffect(.replace))
                                     .onChange(of: isAutoscrolling) {
                                         if isAutoscrolling{
                                             timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
                                                 Task { @MainActor in
-                                                    if currentIndex < feed.count - 1 {
+                                                    if currentIndex < dataManager.feed.count - 1 {
                                                         currentIndex += 1
                                                     }
                                                 }
@@ -68,14 +67,16 @@ struct FeedView: View {
                                     }
                                 }
                                 Button{
-                                    if currentIndex < feed.count - 1{
+                                    if currentIndex < dataManager.feed.count - 1{
                                         currentIndex += 1
                                     }
                                 }label: {
                                     Image(systemName: "chevron.down")
                                         .frame(width: 50, height: 50)
-                                        .glassEffect(.regular)
+                                        .glassEffect(.regular.interactive())
                                 }
+                                .disabled(currentIndex >= dataManager.feed.count - 1)
+                                .foregroundStyle(currentIndex >= dataManager.feed.count - 1 ? .gray : Color.accentColor)
                             }
                             
                             ZStack{
@@ -83,8 +84,8 @@ struct FeedView: View {
                                 ScrollViewReader{ proxy in
                                     ScrollView{
                                         VStack{
-                                            ForEach(Array(feed.enumerated()), id: \.element.id) { index, video in
-                                                PlayingVideoView(video: video, following: $following)
+                                            ForEach(Array(dataManager.feed.enumerated()), id: \.element.id) { index, video in
+                                                PlayingVideoView(video: video)
                                                     .frame(maxWidth: geometry.size.height*9/16,minHeight: geometry.size.height*19/20, maxHeight: geometry.size.height)
                                                     .background(Color.accentColor)
                                                     .mask{
@@ -98,9 +99,9 @@ struct FeedView: View {
                                     }
                                     .scrollIndicators(.hidden)
                                     .onChange(of: currentIndex) {
-                                        if currentIndex + 1 >= feed.count{
-                                            if let nextVideo = videos.rankedVideos(likedTags: dataManager.likedTags).filter({!feed.contains($0)}).first{
-                                                feed.append(nextVideo)
+                                        if currentIndex + 1 >= dataManager.feed.count{
+                                            if let nextVideo = dataManager.videos.rankedVideos(likedTags: dataManager.likedTags).filter({!dataManager.feed.contains($0)}).first{
+                                                dataManager.feed.append(nextVideo)
                                             }else{
                                                 print("touch grass")
                                             }
@@ -108,7 +109,7 @@ struct FeedView: View {
                                         if currentIndex>lastIndex{
                                             lastIndex = currentIndex
                                             lastScore = 0
-                                            for tag in feed[currentIndex].tags{
+                                            for tag in dataManager.feed[currentIndex].tags{
                                                 if dataManager.likedTags.subtracting(additionalTags).contains(tag){
                                                     dataManager.score += 1
                                                     withAnimation {
@@ -116,14 +117,13 @@ struct FeedView: View {
                                                     }
                                                 }
                                             }
-                                            if following.contains(feed[currentIndex].creator){
+                                            if dataManager.following.contains(dataManager.feed[currentIndex].creator){
                                                 dataManager.score += 1
                                             }
                                             Task{
                                                 do{
-                                                    let video = try await generateVideo(likedTags: dataManager.likedTags, creators: following, allVideos: videos)
-                                                    feed.append(video)
-                                                    videos.append(video)
+                                                    let video = try await feedGenerateVideo(dataManager: dataManager)
+                                                    dataManager.videos.append(video)
                                                 }catch{
                                                     print(error.localizedDescription)
                                                 }
@@ -159,7 +159,7 @@ struct FeedView: View {
                                                     currentIndex -= 1
                                                 }
                                             }else if value.translation.height <  geometry.size.height / -4{
-                                                if currentIndex < feed.count - 1{
+                                                if currentIndex < dataManager.feed.count - 1{
                                                     currentIndex += 1
                                                 }
                                             }
@@ -174,23 +174,23 @@ struct FeedView: View {
                                 GlassEffectContainer(spacing: 30){
                                     VStack{
                                         NavigationLink{
-                                            ProfileView(videos: videos, name: feed[currentIndex].creator, following: $following)
+                                            ProfileView(name: dataManager.feed[currentIndex].creator)
                                         }label: {
                                             Image(systemName: "person.crop.circle")
                                                 .frame(width: 50, height: 50)
                                                 .glassEffect(.regular.interactive())
                                         }
                                         Button{
-                                            if following.contains(feed[currentIndex].creator){
-                                                following.remove(feed[currentIndex].creator)
+                                            if dataManager.following.contains(dataManager.feed[currentIndex].creator){
+                                                dataManager.following.remove(dataManager.feed[currentIndex].creator)
                                             }else{
-                                                following.insert(feed[currentIndex].creator)
+                                                dataManager.following.insert(dataManager.feed[currentIndex].creator)
                                             }
                                             if tips.currentTip is FollowTip{
                                                 tips.currentTip?.invalidate(reason: .actionPerformed)
                                             }
                                         }label: {
-                                            Image(systemName: following.contains(feed[currentIndex].creator) ? "checkmark" : "plus")
+                                            Image(systemName: dataManager.following.contains(dataManager.feed[currentIndex].creator) ? "checkmark" : "plus")
                                                 .frame(width: 50, height: 50)
                                                 .glassEffect(.regular.interactive())
                                         }
@@ -199,18 +199,18 @@ struct FeedView: View {
                                     }
                                 }
                                 Button{
-                                    if likedVideos.contains(feed[currentIndex]){
-                                        likedVideos.removeAll(where: {$0 == feed[currentIndex]})
+                                    if likedVideos.contains(dataManager.feed[currentIndex]){
+                                        likedVideos.removeAll(where: {$0 == dataManager.feed[currentIndex]})
                                     }else{
-                                        likedVideos.append(feed[currentIndex])
-                                        dataManager.likedTags.formUnion(feed[currentIndex].tags)
+                                        likedVideos.append(dataManager.feed[currentIndex])
+                                        dataManager.likedTags.formUnion(dataManager.feed[currentIndex].tags)
                                         
                                     }
                                     if tips.currentTip is LikeTip{
                                         tips.currentTip?.invalidate(reason: .actionPerformed)
                                     }
                                 }label: {
-                                    Image(systemName: likedVideos.contains(feed[currentIndex]) ? "heart.fill" :"heart")
+                                    Image(systemName: likedVideos.contains(dataManager.feed[currentIndex]) ? "heart.fill" :"heart")
                                         .frame(width: 50, height: 50)
                                         .glassEffect(.regular.interactive())
                                 }
@@ -224,7 +224,7 @@ struct FeedView: View {
                                     let taskValues = [
                                         "watch": lastIndex,
                                         "like": likedVideos.count,
-                                        "follow": following.count
+                                        "follow": dataManager.following.count
                                     ]
                                     Text("Tasks")
                                         .font(.largeTitle.bold())
@@ -264,8 +264,8 @@ struct FeedView: View {
                 }else{
                     Rectangle()
                         .onAppear(){
-                            feed = Array(videos.rankedVideos(likedTags: dataManager.likedTags).prefix(3))
-                            for tag in feed[currentIndex].tags{
+                            dataManager.feed = Array(dataManager.videos.rankedVideos(likedTags: dataManager.likedTags).prefix(3))
+                            for tag in dataManager.feed[currentIndex].tags{
                                 if dataManager.likedTags.contains(tag){
                                     dataManager.score += 1
                                     lastScore+=1
@@ -316,7 +316,6 @@ struct VideoView: View {
 }
 struct PlayingVideoView: View {
     var video: Video
-    @Binding var following: Set<String>
     var body: some View {
         VStack {
             HStack{
@@ -368,8 +367,7 @@ struct PlayingVideoView: View {
     }
 }
 #Preview {
-    @Previewable @State var following: Set<String> = []
-    PlayingVideoView(video: Video(caption: "ok blacked out like a phantom aaaaaa", tags: ["tuff","timothy"], text: "", image: "", creator: "esdcard"), following: $following)
+    PlayingVideoView(video: Video(caption: "ok blacked out like a phantom aaaaaa", tags: ["tuff","timothy"], text: "", image: "", creator: "esdcard"))
         .frame(width: 500)
         .background(Color.accentColor)
         .mask{

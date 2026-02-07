@@ -139,15 +139,21 @@ struct ChatView: View {
                                 TextButton(text: "sorry", messages: $chat.messages, typing: $typing, next: ["you're always on your phone"])
                                 TextButton(text: "I'm just really busy", messages: $chat.messages, typing: $typing, next: ["that's what you always say"])
                             }
+                        case "you're always on your phone", "that's what you always say":
+                            Color.clear
+                                .onAppear(){
+                                    dataManager.store = true
+                                }
+                            
                         case "Yeah I see you":
-                                Color.clear
-                                    .frame(height: 1)
-                                    .onAppear(){
-                                        if let bowlIndex = dataManager.tasks.firstIndex(where: {$0.name == "bowlingmeet"}), !dataManager.tasks.contains(where: {$0.name == "bowlingmain"}){
-                                            dataManager.tasks[bowlIndex].done = true
-                                            dataManager.tasks.append(ATask(name: "bowlingmain", title: "Bowl without scrolling", image: "figure.bowling", points: 10))
-                                        }
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear(){
+                                    if let bowlIndex = dataManager.tasks.firstIndex(where: {$0.name == "bowlingmeet"}), !dataManager.tasks.contains(where: {$0.name == "bowlingmain"}){
+                                        dataManager.tasks[bowlIndex].done = true
+                                        dataManager.tasks.append(ATask(name: "bowlingmain", title: "Bowl without scrolling", image: "figure.bowling", points: 10))
                                     }
+                                }
                         case "alr then see you in 30":
                             if canMeet{
                                 TextButton(text: "Yo I'm here", messages: $chat.messages, typing: $typing, next: ["Yeah I see you"])
@@ -169,14 +175,13 @@ struct ChatView: View {
                                         }
                                     }
                                 }
+                        case "That was fun":
+                            TextButton(text: "Yeah fr", messages: $chat.messages, typing: $typing, next: ["We should go again sometime"])
+                        case "Bro can you get off your phone":
+                            TextButton(text: "sorry", messages: $chat.messages, typing: $typing, next: ["every time man","you're always on your phone"])
                         default:
                             Color.clear
                                 .frame(height: 1)
-//                                .onChange(of: chat.messages) {
-//                                    if chat.messages.count == 16 {
-//                                        dataManager.store = true
-//                                    }
-//                                }
                         }
                     case "danielletan73":
                         switch lastText{
@@ -185,7 +190,7 @@ struct ChatView: View {
                         default:
                             Color.clear
                                 .frame(height: 1)
-                                .onChange(of: chat.messages) { 
+                                .onChange(of: chat.messages) {
                                     if chat.messages.count == 7 {
                                         dataManager.store = true
                                     }

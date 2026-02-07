@@ -121,23 +121,23 @@ let premadeVideos = [
     Video(caption: "Comment down below what dance I should do next!", tags: ["dance","foryou"], text: "A dance video to a pop song", image: "figure.dance", creator: "mr.slick63"),
     Video(caption: "I had to try this dance", tags: ["dance","fyp"], text: "A dance video to a EDM song", image: "figure.dance", creator: "mr.slick63")
 ]
-#Playground {
-    print("generating...")
-    do{
-        try await print(generateVideo(likedTags: ["cat","cute","food"], creators: ["cutecats191","alexparkman"], allVideos: premadeVideos))
-    }catch{
-        print("Could not generate:" + error.localizedDescription)
-    }
-}
-func generateVideo(likedTags: Set<String>, creators: Set<String>, allVideos: [Video]) async throws -> Video {
+//#Playground {
+//    print("generating...")
+//    do{
+//        try await print(generateVideo(likedTags: ["cat","cute","food"], creators: ["cutecats191","alexparkman"], allVideos: premadeVideos))
+//    }catch{
+//        print("Could not generate:" + error.localizedDescription)
+//    }
+//}
+func feedGenerateVideo(dataManager: DataManager) async throws -> Video {
     var prompt = "You are a short-form content creator. Create a short video."
     var chosenCreator = ""
     var chosenTags = Set<String>()
     var values = [0]
-    if likedTags.count > 5{
+    if dataManager.likedTags.count > 5{
         values.append(1)
     }
-    if creators.count > 5{
+    if dataManager.following.count > 5{
         values.append(2)
     }
     let chosenValue = values.randomElement() ?? 0
@@ -145,17 +145,16 @@ func generateVideo(likedTags: Set<String>, creators: Set<String>, allVideos: [Vi
     case 2:
         let rand = Bool.random()
         if rand{
-            chosenCreator = creators.randomElement()!
-            let creatorVideos = allVideos.filter{$0.creator == chosenCreator}
-            prompt = "You are a short-form content creator by the name of \(chosenCreator). You are going to make a short video. Here are some videos you have made: \(creatorVideos) Make a video similar to the videos you have been making. Do not make the exact same video."
+            chosenCreator = dataManager.following.randomElement()!
+            prompt = creatorGeneratePrompt(for: chosenCreator, allVideos: dataManager.videos)
         }
     case 1:
-        chosenTags = [likedTags.subtracting(additionalTags).randomElement()!]
+        chosenTags = [dataManager.likedTags.subtracting(additionalTags).randomElement()!]
         let rand = Bool.random()
         if rand{
-            chosenTags.insert(likedTags.subtracting(additionalTags).randomElement()!)
+            chosenTags.insert(dataManager.likedTags.subtracting(additionalTags).randomElement()!)
         }
-        let exampleVideos = allVideos.filter{$0.tags.contains(where: { chosenTags.contains($0) })}
+        let exampleVideos = dataManager.videos.filter{$0.tags.contains(where: { chosenTags.contains($0) })}
         prompt = "You are a short-form content creator. You are going to make a short video on the topic(s) of: \(chosenTags.joined(separator: ", ")). Here are some examples of videos on these topics: \(exampleVideos) Do not copy the examples exactly, only follow the examples."
     default:
         chosenTags = [tags.subtracting(additionalTags).randomElement()!]
@@ -163,20 +162,28 @@ func generateVideo(likedTags: Set<String>, creators: Set<String>, allVideos: [Vi
         if rand{
             chosenTags.insert(tags.subtracting(additionalTags).randomElement()!)
         }
-        let exampleVideos = allVideos.filter{$0.tags.contains(where: { chosenTags.contains($0) })}
+        let exampleVideos = dataManager.videos.filter{$0.tags.contains(where: { chosenTags.contains($0) })}
         prompt = "You are a short-form content creator. You are going to make a short video on the topic(s) of: \(chosenTags.joined(separator: ", ")). Here are examples of videos on these topics: \(exampleVideos) Do not copy the examples exactly, only follow the examples."
     }
+    
+    return try await generateVideo(prompt: prompt, chosenCreator: chosenCreator, chosenTags: chosenTags)
+}
+let additionalTags = ["fyp","foryou","viral","foryoupage"]
+func creatorGeneratePrompt(for creator: String, allVideos: [Video]) -> String{
+    let creatorVideos = allVideos.filter{$0.creator == creator}
+    return "You are a short-form content creator by the name of \(creator). You are going to make a short video. Here are some videos you have made: \(creatorVideos) Make a video similar to the videos you have been making. Do not make the exact same video."
+}
+func generateVideo(prompt: String, chosenCreator: String, chosenTags: Set<String>) async throws -> Video{
     let session = LanguageModelSession()
     var generatedVideo = try await session.respond(to: prompt, generating: Video.self).content
     if !chosenCreator.isEmpty{
         generatedVideo.creator = chosenCreator
     }else{
-        if chosenTags.count == 1{
-            chosenTags.insert(additionalTags.randomElement()!)
-        }
         generatedVideo.tags = Array(chosenTags)
+        if chosenTags.count == 1{
+            generatedVideo.tags.append(additionalTags.randomElement()!)
+        }
         
     }
     return generatedVideo
 }
-let additionalTags = ["fyp","foryou","viral","foryoupage"]
