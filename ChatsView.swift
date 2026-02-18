@@ -43,7 +43,6 @@ struct ChatsView: View {
         }
     }
 }
-let lastMessageForPreview = Message(isMe: false, text: "Son")
 #Preview {
     ChatsView()
         .preferredColorScheme(.dark)
@@ -56,6 +55,7 @@ struct ChatView: View {
     @Environment(DataManager.self) var dataManager
     @State private var time = Date.distantFuture
     @State private var canMeet = false
+    @State private var canApologise = false
     var body: some View {
         @Bindable var dataManager = dataManager
         NavigationStack{
@@ -179,6 +179,12 @@ struct ChatView: View {
                             TextButton(text: "Yeah fr", messages: $chat.messages, typing: $typing, next: ["We should go again sometime"])
                         case "Bro can you get off your phone":
                             TextButton(text: "sorry", messages: $chat.messages, typing: $typing, next: ["every time man","you're always on your phone"])
+                        case "We should go again sometime":
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear(){
+                                    dataManager.screentime = true
+                                }
                         default:
                             Color.clear
                                 .frame(height: 1)
@@ -187,12 +193,16 @@ struct ChatView: View {
                         switch lastText{
                         case "Son":
                             TextButton(text: "Yes?", messages: $chat.messages, typing: $typing, next: ["I just got your exam results", "They've been getting worse and worse", "You're always on the phone", "I never see you study", "I think it's time for you to stop"])
+//                        case "I think it's time "
                         default:
                             Color.clear
                                 .frame(height: 1)
                                 .onChange(of: chat.messages) {
                                     if chat.messages.count == 7 {
                                         dataManager.store = true
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0){
+                                            canApologise = true
+                                        }
                                     }
                                 }
                         }
@@ -211,7 +221,7 @@ struct TextButton: View {
     @Binding var typing: Bool
     var next: [String]
     var body: some View {
-        Button(text){
+        Button{
             messages.append(Message(isMe: true, text: text))
             for i in next.indices {
                 typing = true
@@ -223,10 +233,12 @@ struct TextButton: View {
                     }
                 }
             }
+        }label:{
+            Text(text)
+                .padding()
+                .glassEffect(.regular.tint(Color.accentColor))
+                .padding()
+                .foregroundStyle(.white)
         }
-        .padding()
-        .glassEffect(.regular.tint(Color.accentColor))
-        .padding()
-        .foregroundStyle(.white)
     }
 }

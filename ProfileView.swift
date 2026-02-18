@@ -24,31 +24,34 @@ struct ProfileView: View {
                     .font(.largeTitle)
                     .bold()
                 if dataManager.following.contains(name){
-                    Button("Following"){
+                    Button{
                         showAlert = true
+                    }label:{
+                        Text("Following")
+                            .font(.title)
+                            .padding()
+                            .glassEffect()
+                            .foregroundStyle(.white)
+                            .padding(5)
                     }
-                    .font(.title)
-                    .padding()
-                    .glassEffect()
-                    .foregroundStyle(.white)
-                    .padding(5)
                     .alert("Unfollow?", isPresented: $showAlert) {
                         Button("Unfollow", role: .destructive){
                             dataManager.following.remove(name)
                         }
                     }
                 }else{
-                    Button("Follow"){
+                    Button{
                         withAnimation {
                             _ = dataManager.following.insert(name)
                         }
+                    }label:{
+                        Text("Follow")
+                            .font(.title)
+                            .padding()
+                            .glassEffect(.regular.tint(.accentColor))
+                            .foregroundStyle(.white)
+                            .padding(5)
                     }
-                    .font(.title)
-                    .padding()
-                    .glassEffect(.regular.tint(.accentColor))
-                    .foregroundStyle(.white)
-                    .padding(5)
-                    
                 }
                 Divider()
                 ScrollView(.vertical){

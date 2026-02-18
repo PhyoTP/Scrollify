@@ -126,7 +126,7 @@ struct BowlingView: View {
                             }
                         }
                 }else{
-                    ActionButton(name: "Retry"){
+                    ActionButton("Retry"){
                         currentOffset = geometry.size.width/3
                         endOffset = currentOffset
                         withAnimation {
@@ -176,11 +176,6 @@ struct BowlingView: View {
             Button("Dismiss"){}
             Button("Open"){
                 dataManager.tabSelection = "feed"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 10){
-                    if let friendIndex = dataManager.chats.firstIndex(where: {$0.user == "bobby1479"}){
-                        dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "Bro can you get off your phone"))
-                    }
-                }
                 dismiss()
             }
         }message: {

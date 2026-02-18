@@ -26,6 +26,8 @@ import TipKit
     var following: Set<String> = []
     var videos = premadeVideos
     var feed: [Video] = []
+    var screentime = false
+    var doneScreentime = false
 }
 @main
 struct MyApp: App {
@@ -37,7 +39,7 @@ struct MyApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(dataManager.doneScreentime ? .light : .dark)
                 .environment(dataManager)
         }
     }

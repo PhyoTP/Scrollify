@@ -25,14 +25,13 @@ struct ContentView: View {
                             }
                             .shadow(color: .white, radius: 100)
                             .scaleEffect(scale*1.01)
-                        AppView(back: back)
+                        AppView()
                             .mask{
                                 RoundedRectangle(cornerRadius: 30)
                                     .ignoresSafeArea()
                             }
                             .scaleEffect(scale)
                             .onChange(of: dataManager.autoscroll) { oldValue, newValue in
-                                //                        .onAppear(){
                                 if newValue{
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                                         zoomOut = false
@@ -46,6 +45,21 @@ struct ContentView: View {
                                             opacity = 0.0
                                         }
                                     }
+                                }
+                            }
+                            .onChange(of: dataManager.doneScreentime) { oldValue, newValue in
+                                if newValue{
+                                        zoomOut = false
+                                        withAnimation(.linear(duration: 5)) {
+                                            scale = 0.5
+                                        }
+                                        withAnimation(.linear.delay(5)) {
+                                            endingText = "The Good Ending"
+                                        }
+                                        withAnimation(.linear.delay(10)) {
+                                            opacity = 0.0
+                                        }
+                                    
                                 }
                             }
                             .allowsHitTesting(zoomOut)
@@ -100,7 +114,7 @@ struct WelcomeView: View {
                     .bold()
                 FlowLayout{
                     ForEach(Array(tags), id: \.self){tag in
-                        Button(tag.capitalized){
+                        Button{
                             withAnimation {
                                 if dataManager.likedTags.contains(tag){
                                     dataManager.likedTags.remove(tag)
@@ -108,12 +122,14 @@ struct WelcomeView: View {
                                     dataManager.likedTags.insert(tag)
                                 }
                             }
+                        }label:{
+                            Text(tag.capitalized)
+                                .bold()
+                                .padding(10)
+                                .glassEffect(dataManager.likedTags.contains(tag) ? .regular.tint(.accentColor) : .regular)
+                                .foregroundStyle(.white)
+                                .padding(5)
                         }
-                        .bold()
-                        .padding(10)
-                        .glassEffect(dataManager.likedTags.contains(tag) ? .regular.tint(.accentColor) : .regular)
-                        .foregroundStyle(.white)
-                        .padding(5)
                         
                     }
                 }
@@ -137,7 +153,7 @@ struct WelcomeView: View {
                 IntroView(image: "apple.intelligence", title: "Generated Content", description: "Scrollify gauges the types of videos you are interested in and uses Foundation Models to generate content you might like.")
                 IntroView(image: "face.smiling", title: "Dopamine Points", description: "Whenever you see a video that matches your interests, you will get dopamine points based on how much your previous interests overlap.")
                 IntroView(image: "heart", title: "Liking", description: "Like a video to see more posts like it. Liking it also gives you more points when a video similar to it appears.")
-                ActionButton(name: "Start"){
+                ActionButton("Start"){
                     done = true
                     let model = SystemLanguageModel.default
                     switch model.availability {
@@ -243,76 +259,69 @@ struct EndingView: View {
                 Text("This is especially true amongst teenagers, where:")
                 IntroView(image: "chart.bar.xaxis", title: "In the US", description: "Teens often exceed 3–4+ hours per day. ", custom: true)
                 Text("That’s about the same as a full day’s worth of time every week.")
-                Button("Next"){
+                ActionButton("Next"){
                     withAnimation {
                         page += 1
                     }
                 }
-                .actionButton()
             case 2:
                 Text("Social media addiction isn't something new. However, short-form video platforms have made it even more addictive.")
                 IntroView(image: "play.square.stack.fill", title: "Social Media Algorithms", description: "Give you a calculated, never-ending stream of posts you are guaranteed to like, making it especially hard to put down your device.", custom: true)
                 IntroView(image: "chart.pie.fill", title: "Teenage Addiction", description: "One in two teenagers report feeling “addicted” to social media.", custom: true)
-                Button("Next"){
+                ActionButton("Next"){
                     withAnimation {
                         page += 1
                     }
                 }
-                .actionButton()
             case 3:
                 Text("Social media addiction comes with many drawbacks. It causes you to spend less time:")
                 IntroView(image: "person.3.fill", title: "With people who matter", description: "Family, friends, relationships that aren't parasocial", custom: true)
                 IntroView(image: "chart.pie.fill", title: "Doing things that matter", description: "Work, passions, things that are productive", custom: true)
                 IntroView(image: "person.crop.circle.fill", title: "For yourself", description: "Exercising, reflecting, giving yourself a true break", custom: true)
-                Button("Next"){
+                ActionButton("Next"){
                     withAnimation {
                         page += 1
                     }
                 }
-                .actionButton()
             case 5:
                 Text("Excessive screen time can lead to:")
                 IntroView(image: "eye.trianglebadge.exclamationmark.fill", title: "Eye strain", description: "Constantly staring at a screen is bad for your eyes and can lead to things like headaches and blurred vision.", custom: true)
                 IntroView(image: "bed.double.fill", title: "Sleep deprivation", description: "When you scroll at night, the bright light from your phone makes it harder to sleep.", custom: true)
                 IntroView(image: "brain.fill", title: "Decreased attention span", description: "The short-form nature of the videos where creators try to fit as much content as possible causes you to not be able to concentrate as well on other things.", custom: true)
-                Button("Next"){
+                ActionButton("Next"){
                     withAnimation {
                         page += 1
                     }
                 }
-                .actionButton()
             case 4:
                 Text("I used to be addicted to social media too. Some of the symptoms include, but are not limited to:")
                 IntroView(image: "iphone.and.arrow.right.inward", title: "Opening the app instinctively", description: "Unconsicously opening the app whenever you have time (or don't)", custom: true)
                 IntroView(image: "arrow.turn.up.forward.iphone.fill", title: "Reopening the app", description: "Going back to the app right when you close it, sometimes repeatedly", custom: true)
                 IntroView(image: "clock.fill", title: "Spending more time than you want to on it", description: "Thinking to yourself 'I'll just watch for a few minutes', then hours pass", custom: true)
                 IntroView(image: "brain.fill", title: "Thinking about it all the time", description: "Not being able to concentrate on anything else", custom: true)
-                Button("Next"){
+                ActionButton("Next"){
                     withAnimation {
                         page += 1
                     }
                 }
-                .actionButton()
             case 6:
                 Text("Don’t get me wrong – I'm not saying we should stop using social media entirely – it definitely has its benefits. But it's easy to get into the wrong corners of the internet.")
                 IntroView(image: "exclamationmark.triangle.text.page.fill", title: "Fake news", description: "Misinformation meant to mislead people into thinking it's real", custom: true)
                 IntroView(image: "person.badge.shield.exclamationmark.fill", title: "Hate speech", description: "Videos or posts that spread hatred or discrimination against any group of people", custom: true)
                 IntroView(image: "person.crop.circle.dashed", title: "Echo chambers", description: "The algorithm feeds your beliefs, making you engage more with the content, in a never-ending feedback loop", custom: true)
-                Button("Next"){
+                ActionButton("Next"){
                     withAnimation {
                         page += 1
                     }
                 }
-                .actionButton()
             case 7:
                 Text("If you think you’re addicted, here are some ways to stop:")
                 IntroView(image: "hourglass", title: "Set screen time limits", description: "Even better if you can get someone else to set a passcode (parents, relatives, friends)", custom: true)
                 IntroView(image: "powersleep", title: "Have a downtime", description: "So that you don't do it as the first or last thing you do in a day", custom: true)
                 IntroView(image: "trash.fill", title: "Delete the app entirely", description: "Works surprisingly well, from personal experience", custom: true)
-                Button("Go to Screen Time"){
+                ActionButton("Complete"){
                     back = true
                 }
-                .actionButton()
             default:
                 Text("wait im not done with this yet")
             }
@@ -326,21 +335,25 @@ struct EndingView: View {
 //    EndingView(back: $back)
 //        .preferredColorScheme(.dark)
 //}
-extension Button{
-    func actionButton() -> some View {
-        self
-            .padding()
-            .background(Color.accentColor)
-            .foregroundStyle(.white)
-            .bold()
-            .mask{
-                RoundedRectangle(cornerRadius: 10)
-            }
-    }
-}
+//extension Button{
+//    func actionButton() -> some View {
+//        self
+//            .padding()
+//            .background(Color.accentColor)
+//            .foregroundStyle(.white)
+//            .bold()
+//            .mask{
+//                RoundedRectangle(cornerRadius: 10)
+//            }
+//    }
+//}
 struct ActionButton: View{
     var name: String
     var action: () -> Void
+    init(_ name: String, action: @escaping () -> Void) {
+        self.name = name
+        self.action = action
+    }
     var body: some View{
         Button(action: action){
             Text(name)

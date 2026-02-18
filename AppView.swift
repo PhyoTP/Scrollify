@@ -14,9 +14,10 @@ struct AppView: View{
     @State private var storeAlert = false
     @Environment(DataManager.self) var dataManager
     @State private var autoscrollAlert = false
-    var back: Bool
     @State private var taskAlert = false
     @State private var bowlingSheet = false
+    @State private var screentimeAlert = false
+    @State private var studySheet = false
     var body: some View{
         @Bindable var dataManager = dataManager
         TabView(selection: $dataManager.tabSelection){
@@ -38,13 +39,7 @@ struct AppView: View{
                     Label("Store", systemImage: "storefront")
                 }
             }
-            Tab(value: "debug"){ // MUST DELETE
-                Toggle("has store", isOn: $dataManager.store)
-                Toggle("has autoscroll", isOn: $dataManager.autoscroll)
-            }label: {
-                Label("Debug", systemImage: "arrow.2.circlepath.circle")
-            }
-            if back{
+            if dataManager.screentime{
                 Tab(value: "screentime"){
                     ScreenTimeView()
                 }label: {
@@ -116,6 +111,13 @@ struct AppView: View{
                 
                 .searchable(text: $query)
             }
+            Tab(value: "debug"){ // MUST DELETE
+                Toggle("has store", isOn: $dataManager.store)
+                Toggle("has autoscroll", isOn: $dataManager.autoscroll)
+                Toggle("has screen time", isOn: $dataManager.screentime)
+            }label: {
+                Label("Debug", systemImage: "arrow.2.circlepath.circle")
+            }
         }
         .tabViewSearchActivation(.searchTabSelection)
         .onChange(of: dataManager.chats) { oldValue, newValue in
@@ -174,21 +176,43 @@ struct AppView: View{
             }
         }
         .alert("New task", isPresented: $taskAlert){
-            if let lastTask = dataManager.tasks.last, lastTask.name == "bowlingmain"{
-                Button("Go bowling"){
-                    bowlingSheet = true
+            if let lastTask = dataManager.tasks.last{
+                if lastTask.name == "bowlingmain"{
+                    Button("Go bowling"){
+                        bowlingSheet = true
+                    }
+                }else if lastTask.name == "study"{
+                    Button("Later"){}
+                    Button("Go study"){
+                        studySheet = true
+                    }
                 }
             }
         } message: {
             if let lastTask = dataManager.tasks.last{
-                Label(lastTask.title, systemImage: lastTask.image)
-                    .labelStyle(.titleAndIcon)
+                Text(lastTask.title)
             }
         }
         .sheet(isPresented: $bowlingSheet) {
             BowlingView()
                 .preferredColorScheme(.light)
                 .environment(dataManager)
+        }
+        .sheet(isPresented: $studySheet) {
+            StudyView()
+                .environment(dataManager)
+        }
+        .onChange(of: dataManager.screentime) {
+            if dataManager.screentime{
+                screentimeAlert = true
+            }
+        }
+        .alert("New feature!", isPresented: $screentimeAlert) {
+            Button("Go to screen time"){
+                dataManager.tabSelection = "screentime"
+            }
+        } message: {
+            Text("Screen Time has been added, set an app limit and downtime")
         }
     }
 }

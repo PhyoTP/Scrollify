@@ -131,11 +131,19 @@ struct FeedView: View {
                                             if let friendIndex = dataManager.chats.firstIndex(where: {$0.user == "bobby1479"}), let momIndex = dataManager.chats.firstIndex(where: {$0.user == "danielletan73"}){
                                                 if lastIndex == 10{
                                                     dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "yo bro"))
+                                                }else if lastIndex == 15{
+                                                    if !dataManager.tasks.contains(where: {$0.name == "bowlingmeet"}){
+                                                        dataManager.tasks.append(ATask(name: "study", title: "Study for your test tomorrow", image: "text.page", points: 5))
+                                                    }else if let bowl = dataManager.tasks.first(where: {$0.name == "bowlingmain"}), !bowl.done{
+                                                        dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "Bro can you get off your phone"))
+                                                    }
                                                 }else if lastIndex == 20{
-                                                    if dataManager.chats[friendIndex].messages.last?.text == "alr then see you in 30"{
-//                                                        dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "bro u here yet"))
-                                                    }else{
+                                                    if let study = dataManager.tasks.first(where: {$0.name == "study"}), !study.done{
                                                         dataManager.chats[momIndex].messages.append(Message(isMe: false, text: "Son"))
+                                                    }
+                                                }else if lastIndex == 30{
+                                                    if !dataManager.store{
+                                                        dataManager.store = true
                                                     }
                                                 }
                                             }
