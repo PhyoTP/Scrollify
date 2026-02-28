@@ -5,22 +5,26 @@ import TipKit
 struct FeedView: View {
     @State private var currentIndex = 0
     @State private var currentOffset: CGFloat = 0
-    @State private var likedVideos: [Video] = []
     @State private var lastIndex = 0
-    @State private var lastScore = 0
+//    @State private var lastScore = 0
     @Environment(DataManager.self) var dataManager
     @State private var isAutoscrolling = false
     @State private var timer: Timer?
     @State private var lastAutoscroll = false
     @State var tips = TipGroup(.ordered) {
+            ScrollTip()
             LikeTip()
             FollowTip()
         }
+    var openedVideos: [Video] = []
+    @State private var feed: [Video] = []
+    @State private var cannotGenAlert = false
+    @State private var genError = ""
     var body: some View {
         @Bindable var dataManager = dataManager
         GeometryReader { geometry in
             NavigationStack{
-                if !dataManager.feed.isEmpty{
+                if !feed.isEmpty{
                     ZStack{
                         HStack{
                             Spacer()
@@ -49,7 +53,7 @@ struct FeedView: View {
                                         if isAutoscrolling{
                                             timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
                                                 Task { @MainActor in
-                                                    if currentIndex < dataManager.feed.count - 1 {
+                                                    if currentIndex < feed.count - 1 {
                                                         currentIndex += 1
                                                     }
                                                 }
@@ -67,16 +71,20 @@ struct FeedView: View {
                                     }
                                 }
                                 Button{
-                                    if currentIndex < dataManager.feed.count - 1{
+                                    if currentIndex < feed.count - 1{
                                         currentIndex += 1
+                                    }
+                                    if tips.currentTip is LikeTip{
+                                        tips.currentTip?.invalidate(reason: .actionPerformed)
                                     }
                                 }label: {
                                     Image(systemName: "chevron.down")
                                         .frame(width: 50, height: 50)
                                         .glassEffect(.regular.interactive())
                                 }
-                                .disabled(currentIndex >= dataManager.feed.count - 1)
-                                .foregroundStyle(currentIndex >= dataManager.feed.count - 1 ? .gray : Color.accentColor)
+                                .disabled(currentIndex >= feed.count - 1)
+                                .foregroundStyle(currentIndex >= feed.count - 1 ? .gray : Color.accentColor)
+                                .popoverTip(tips.currentTip as? ScrollTip)
                             }
                             
                             ZStack{
@@ -84,7 +92,7 @@ struct FeedView: View {
                                 ScrollViewReader{ proxy in
                                     ScrollView{
                                         VStack{
-                                            ForEach(Array(dataManager.feed.enumerated()), id: \.element.id) { index, video in
+                                            ForEach(Array(feed.enumerated()), id: \.element.id) { index, video in
                                                 PlayingVideoView(video: video)
                                                     .frame(maxWidth: geometry.size.height*9/16,minHeight: geometry.size.height*19/20, maxHeight: geometry.size.height)
                                                     .background(Color.accentColor)
@@ -98,52 +106,62 @@ struct FeedView: View {
                                         
                                     }
                                     .scrollIndicators(.hidden)
+                                    .alert("Unable to generate video:",isPresented: $cannotGenAlert){} message: {
+                                        Text(genError)
+                                    }
                                     .onChange(of: currentIndex) {
-                                        if currentIndex + 1 >= dataManager.feed.count{
-                                            if let nextVideo = dataManager.videos.rankedVideos(likedTags: dataManager.likedTags).filter({!dataManager.feed.contains($0)}).first{
-                                                dataManager.feed.append(nextVideo)
+                                        if currentIndex + 1 >= feed.count{
+                                            if let nextVideo = dataManager.videos.rankedVideos(dataManager: dataManager).filter({!feed.contains($0)}).first{
+                                                feed.append(nextVideo)
                                             }else{
                                                 print("touch grass")
                                             }
                                         }
                                         if currentIndex>lastIndex{
                                             lastIndex = currentIndex
-                                            lastScore = 0
-                                            for tag in dataManager.feed[currentIndex].tags{
-                                                if dataManager.likedTags.subtracting(additionalTags).contains(tag){
-                                                    dataManager.score += 1
-                                                    withAnimation {
-                                                        lastScore+=1
+                                            dataManager.videoCount += 1
+                                            if !openedVideos.contains(feed[currentIndex]){
+                                                for tag in feed[currentIndex].tags{
+                                                    if dataManager.likedTags.subtracting(additionalTags).contains(tag){
+                                                        dataManager.score += 1
                                                     }
                                                 }
-                                            }
-                                            if dataManager.following.contains(dataManager.feed[currentIndex].creator){
-                                                dataManager.score += 1
+                                                if dataManager.following.contains(feed[currentIndex].creator){
+                                                    dataManager.score += 1
+                                                }
                                             }
                                             Task{
                                                 do{
                                                     let video = try await feedGenerateVideo(dataManager: dataManager)
                                                     dataManager.videos.append(video)
                                                 }catch{
+                                                    if genError != error.localizedDescription{
+                                                        cannotGenAlert = true
+                                                    }
+                                                    genError = error.localizedDescription
                                                     print(error.localizedDescription)
                                                 }
                                             }
-                                            if let friendIndex = dataManager.chats.firstIndex(where: {$0.user == "bobby1479"}), let momIndex = dataManager.chats.firstIndex(where: {$0.user == "danielletan73"}){
-                                                if lastIndex == 10{
-                                                    dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "yo bro"))
-                                                }else if lastIndex == 15{
-                                                    if !dataManager.tasks.contains(where: {$0.name == "bowlingmeet"}){
-                                                        dataManager.tasks.append(ATask(name: "study", title: "Study for your test tomorrow", image: "text.page", points: 5))
-                                                    }else if let bowl = dataManager.tasks.first(where: {$0.name == "bowlingmain"}), !bowl.done{
+                                            if openedVideos.isEmpty{
+                                                if let friendIndex = dataManager.chats.firstIndex(where: {$0.user == "bobby1479"}), let momIndex = dataManager.chats.firstIndex(where: {$0.user == "danielletan73"}){
+                                                    if lastIndex == 10{
+                                                        dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "yo bro"))
+                                                    }else if lastIndex == 15{
+                                                        if !dataManager.tasks.contains(where: {$0.name == "bowlingmeet"}){
+                                                            dataManager.tasks.append(ATask(name: "study", title: "Study for your test tomorrow", image: "text.page", points: 5))
+                                                            isAutoscrolling = false
+                                                        }
+                                                    }else if lastIndex == 20{
+                                                        if let study = dataManager.tasks.first(where: {$0.name == "study"}), !study.done{
+                                                            dataManager.chats[momIndex].messages.append(Message(isMe: false, text: "Son"))
+                                                        }
+                                                    }else if lastIndex == 30{
+                                                        if !dataManager.store{
+                                                            dataManager.store = true
+                                                        }
+                                                    }
+                                                    if let bowl = dataManager.tasks.first(where: {$0.name == "bowlingmain"}), !bowl.done, !dataManager.chats[friendIndex].messages.contains(where: {$0.text == "Bro can you get off your phone"}){
                                                         dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "Bro can you get off your phone"))
-                                                    }
-                                                }else if lastIndex == 20{
-                                                    if let study = dataManager.tasks.first(where: {$0.name == "study"}), !study.done{
-                                                        dataManager.chats[momIndex].messages.append(Message(isMe: false, text: "Son"))
-                                                    }
-                                                }else if lastIndex == 30{
-                                                    if !dataManager.store{
-                                                        dataManager.store = true
                                                     }
                                                 }
                                             }
@@ -151,6 +169,9 @@ struct FeedView: View {
                                         withAnimation {
                                             proxy.scrollTo(currentIndex)
                                         }
+                                    }
+                                    .onChange(of: dataManager.tabSelection) {
+                                        isAutoscrolling = dataManager.tabSelection == "feed"
                                     }
                                 }
                                 Rectangle()
@@ -167,7 +188,7 @@ struct FeedView: View {
                                                     currentIndex -= 1
                                                 }
                                             }else if value.translation.height <  geometry.size.height / -4{
-                                                if currentIndex < dataManager.feed.count - 1{
+                                                if currentIndex < feed.count - 1{
                                                     currentIndex += 1
                                                 }
                                             }
@@ -182,23 +203,23 @@ struct FeedView: View {
                                 GlassEffectContainer(spacing: 30){
                                     VStack{
                                         NavigationLink{
-                                            ProfileView(name: dataManager.feed[currentIndex].creator)
+                                            ProfileView(name: feed[currentIndex].creator)
                                         }label: {
                                             Image(systemName: "person.crop.circle")
                                                 .frame(width: 50, height: 50)
                                                 .glassEffect(.regular.interactive())
                                         }
                                         Button{
-                                            if dataManager.following.contains(dataManager.feed[currentIndex].creator){
-                                                dataManager.following.remove(dataManager.feed[currentIndex].creator)
+                                            if dataManager.following.contains(feed[currentIndex].creator){
+                                                dataManager.following.remove(feed[currentIndex].creator)
                                             }else{
-                                                dataManager.following.insert(dataManager.feed[currentIndex].creator)
+                                                dataManager.following.insert(feed[currentIndex].creator)
                                             }
                                             if tips.currentTip is FollowTip{
                                                 tips.currentTip?.invalidate(reason: .actionPerformed)
                                             }
                                         }label: {
-                                            Image(systemName: dataManager.following.contains(dataManager.feed[currentIndex].creator) ? "checkmark" : "plus")
+                                            Image(systemName: dataManager.following.contains(feed[currentIndex].creator) ? "checkmark" : "plus")
                                                 .frame(width: 50, height: 50)
                                                 .glassEffect(.regular.interactive())
                                         }
@@ -207,18 +228,17 @@ struct FeedView: View {
                                     }
                                 }
                                 Button{
-                                    if likedVideos.contains(dataManager.feed[currentIndex]){
-                                        likedVideos.removeAll(where: {$0 == dataManager.feed[currentIndex]})
+                                    if dataManager.likedVideos.contains(feed[currentIndex]){
+                                        dataManager.likedVideos.removeAll(where: {$0 == feed[currentIndex]})
                                     }else{
-                                        likedVideos.append(dataManager.feed[currentIndex])
-                                        dataManager.likedTags.formUnion(dataManager.feed[currentIndex].tags)
-                                        
+                                        dataManager.likedVideos.append(feed[currentIndex])
+                                        dataManager.likedTags.formUnion(feed[currentIndex].tags)
                                     }
                                     if tips.currentTip is LikeTip{
                                         tips.currentTip?.invalidate(reason: .actionPerformed)
                                     }
                                 }label: {
-                                    Image(systemName: likedVideos.contains(dataManager.feed[currentIndex]) ? "heart.fill" :"heart")
+                                    Image(systemName: dataManager.likedVideos.contains(feed[currentIndex]) ? "heart.fill" :"heart")
                                         .frame(width: 50, height: 50)
                                         .glassEffect(.regular.interactive())
                                 }
@@ -228,42 +248,12 @@ struct FeedView: View {
                         }
                         HStack{
                             VStack{
-                                VStack{
-                                    let taskValues = [
-                                        "watch": lastIndex,
-                                        "like": likedVideos.count,
-                                        "follow": dataManager.following.count
-                                    ]
-                                    Text("Tasks")
-                                        .font(.largeTitle.bold())
-                                    ForEach($dataManager.tasks, id: \.name) { $task in
-                                        TaskView(task: $task, value: taskValues[task.name] ?? (task.done ? 1 : 0), lastScore: $lastScore)
-                                    }
-                                }
-                                .frame(width: 200)
-                                .padding()
-                                .glassEffect(in: .rect(cornerRadius: 25))
+                                
                                 Spacer()
                             }
                             Spacer()
                             VStack{
-                                HStack{
-                                    Image(systemName: "face.smiling")
-                                    Text("\(dataManager.score)")
-                                }
-                                .bold()
-                                .padding(10)
-                                .glassEffect(.regular)
-                                Text("\(lastScore>0 ? "+" : "-")\(lastScore)")
-                                    .foregroundStyle(lastScore > 0 ? .green : lastScore < 0 ? .red : .clear)
-                                    .onAppear(){
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                                            withAnimation(.easeOut(duration: 0.3)) {
-                                                lastScore = 0
-                                            }
-                                        }
-                                    }
-                                
+                                TasksView()
                                 Spacer()
                             }
                             .padding(.horizontal)
@@ -272,12 +262,16 @@ struct FeedView: View {
                 }else{
                     Rectangle()
                         .onAppear(){
-                            dataManager.feed = Array(dataManager.videos.rankedVideos(likedTags: dataManager.likedTags).prefix(3))
-                            for tag in dataManager.feed[currentIndex].tags{
-                                if dataManager.likedTags.contains(tag){
-                                    dataManager.score += 1
-                                    lastScore+=1
+                            if openedVideos.isEmpty{
+                                feed = Array(dataManager.videos.rankedVideos(dataManager: dataManager).prefix(3))
+                                for tag in feed[currentIndex].tags{
+                                    if dataManager.likedTags.contains(tag){
+                                        dataManager.score += 1
+                                    }
                                 }
+                            }else{
+                                feed = openedVideos
+                                feed.append(contentsOf: Array(dataManager.videos.rankedVideos(dataManager: dataManager, videos: openedVideos).prefix(3)))
                             }
                         }
                 }
@@ -286,9 +280,10 @@ struct FeedView: View {
     }
 }
 extension [Video]{
-    func rankedVideos(likedTags: Set<String>) -> [Video] {
-        return self.map{ video in
-            (video, video.tags.filter{likedTags.contains($0)}.count)
+    func rankedVideos(dataManager: DataManager, videos: [Video] = []) -> [Video] {
+        let tags = Set(videos.flatMap(\.tags))
+        return self.filter{!(videos.isEmpty ? dataManager.likedVideos : videos).contains($0)}.map{ video in
+            (video, video.tags.filter{(tags.isEmpty ? dataManager.likedTags : tags).contains($0)}.count)
         }
         .sorted(by: { $0.1 > $1.1 })
         .map{$0.0}
@@ -374,14 +369,7 @@ struct PlayingVideoView: View {
         .padding()
     }
 }
-#Preview {
-    PlayingVideoView(video: Video(caption: "ok blacked out like a phantom aaaaaa", tags: ["tuff","timothy"], text: "", image: "", creator: "esdcard"))
-        .frame(width: 500)
-        .background(Color.accentColor)
-        .mask{
-            RoundedRectangle(cornerRadius: 50)
-        }
-}
+
 struct LikeTip: Tip{
     var title: Text {
         Text("Liking videos")
@@ -404,50 +392,14 @@ struct FollowTip: Tip{
         Image(systemName: "person.3.fill")
     }
 }
-struct TaskView: View{
-    @Binding var task: ATask
-    var value: Int
-    @State private var animatedValue = 0.0
-    @Environment(DataManager.self) var dataManager
-    @Binding var lastScore: Int
-    @State private var done = false
-    var body: some View{
-        @Bindable var dataManager = dataManager
-        if !task.done{
-            ProgressView(value: animatedValue, total: Double(task.total)){
-                HStack{
-                    Image(systemName: task.image)
-                    Text("\(task.title)")
-                    Spacer()
-                    Text("\(task.points)")
-                    Image(systemName: "face.smiling")
-                }
-            }
-            .tint(value >= task.total ? .green : .accentColor)
-            .onChange(of: value){
-                withAnimation(.easeOut) {
-                    animatedValue = Double(value)
-                }
-                if value == task.total && !done{
-                    done = true
-                    dataManager.score += task.points
-                    withAnimation {
-                        lastScore+=task.points
-                    }
-                    withAnimation(.linear.delay(1)) {
-                        task.done = true
-                    }
-                }
-            }
-            
-        }
+struct ScrollTip: Tip{
+    var title: Text{
+        Text("Scrolling")
     }
-}
-struct ATask: Equatable{
-    var name: String
-    var title: String
-    var total: Int = 1
-    var image: String
-    var points: Int
-    var done = false
+    var message: Text?{
+        Text("Swipe or use this button to go to the next video")
+    }
+    var image: Image?{
+        Image(systemName: "play.square.stack")
+    }
 }

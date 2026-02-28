@@ -28,7 +28,9 @@ struct StoreView: View {
                                 .font(.title)
                             Text(item.description)
                             Button{
-                                dataManager.autoscroll = true
+                                if item.name == "Autoscroll"{
+                                    dataManager.autoscroll = true
+                                }
                             }label: {
                                 HStack{
                                     Image(systemName: "face.smiling")

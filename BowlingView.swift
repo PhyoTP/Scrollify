@@ -40,6 +40,11 @@ struct BowlingView: View {
                                     .multilineTextAlignment(.center)
                                     .font(.system(size: 20))
                             }
+                            if score == 0{
+                                Text("Drag the ball up to throw")
+                                    .multilineTextAlignment(.center)
+                                    .font(.system(size: 20))
+                            }
                         }
                             .foregroundStyle(.white)
                             .padding()
@@ -152,7 +157,7 @@ struct BowlingView: View {
                         do{
                             let video = try await generateVideo(prompt: prompt, chosenCreator: chosenCreator, chosenTags: Set<String>())
                             dataManager.videos.append(video)
-                            dataManager.feed.insert(video, at: dataManager.feed.count - 2)
+//                            dataManager.feed.insert(video, at: dataManager.feed.count - 2)
                         }catch{
                             alertText = "We found a video you might like"
                         }
@@ -168,6 +173,7 @@ struct BowlingView: View {
                 if let bowlIndex = dataManager.tasks.firstIndex(where: {$0.name == "bowlingmain"}), let friendIndex = dataManager.chats.firstIndex(where: {$0.user == "bobby1479"}){
                     dataManager.tasks[bowlIndex].done = true
                     dataManager.chats[friendIndex].messages.append(Message(isMe: false, text: "That was fun"))
+                    dataManager.score += score
                     dismiss()
                 }
             }

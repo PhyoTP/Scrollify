@@ -46,6 +46,13 @@ struct AppView: View{
                     Label("Screen Time", image: "hourglass")
                 }
             }
+            if !dataManager.endings.isEmpty{
+                Tab(value: "achievements") {
+                    AchievementsView()
+                }label:{
+                    Label("Achievements", systemImage: "trophy")
+                }
+            }
             Tab(value: "search", role: .search) {
                 
                 NavigationStack{
@@ -89,7 +96,7 @@ struct AppView: View{
                                 LazyVGrid(columns: [GridItem(.flexible()),GridItem(.flexible())]){
                                     ForEach(filteredVideos){video in
                                         NavigationLink{
-                                            PlayingVideoView(video: video)
+                                            FeedView(openedVideos: Array(filteredVideos.dropFirst(filteredVideos.firstIndex(of: video) ?? 0)))
                                         }label:{
                                             VideoView(video: video)
                                                 .frame(maxWidth: .infinity)
@@ -111,13 +118,13 @@ struct AppView: View{
                 
                 .searchable(text: $query)
             }
-            Tab(value: "debug"){ // MUST DELETE
-                Toggle("has store", isOn: $dataManager.store)
-                Toggle("has autoscroll", isOn: $dataManager.autoscroll)
-                Toggle("has screen time", isOn: $dataManager.screentime)
-            }label: {
-                Label("Debug", systemImage: "arrow.2.circlepath.circle")
-            }
+//            Tab(value: "debug"){ // MUST DELETE
+//                Toggle("has store", isOn: $dataManager.store)
+//                Toggle("has autoscroll", isOn: $dataManager.autoscroll)
+//                Toggle("has screen time", isOn: $dataManager.screentime)
+//            }label: {
+//                Label("Debug", systemImage: "arrow.2.circlepath.circle")
+//            }
         }
         .tabViewSearchActivation(.searchTabSelection)
         .onChange(of: dataManager.chats) { oldValue, newValue in
@@ -139,6 +146,7 @@ struct AppView: View{
             Button("Go to chats"){
                 dataManager.tabSelection = "chats"
             }
+            Button("Dismiss"){}
         } message: {
             if let lastMessage = dataManager.newMessages.last{
                 Text(lastMessage.0 + ": " + lastMessage.1.text)

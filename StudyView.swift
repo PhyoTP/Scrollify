@@ -49,6 +49,11 @@ struct StudyView: View {
                     VStack{
                         Text("Score: \(know)")
                             .font(.custom("HelveticaNeue-bold", size: 30))
+                        if know == 0{
+                            Text("Answer the math equations")
+                                .multilineTextAlignment(.center)
+                                .font(.system(size: 20))
+                        }
                     }
                     .foregroundStyle(Color.accentColor)
                         .padding()
@@ -114,7 +119,7 @@ struct StudyView: View {
                         do{
                             let video = try await generateVideo(prompt: prompt, chosenCreator: chosenCreator, chosenTags: Set<String>())
                             dataManager.videos.append(video)
-                            dataManager.feed.insert(video, at: dataManager.feed.count - 2)
+//                            dataManager.feed.insert(video, at: dataManager.feed.count - 2)
                         }catch{
                             alertText = "We found a video you might like"
                         }
@@ -127,9 +132,10 @@ struct StudyView: View {
                 alertText = "Come back, we have new videos!"
                 showAlert = true
             }else{
-                if let studyIndex = dataManager.tasks.firstIndex(where: {$0.name == "study"})/*, let momIndex = dataManager.chats.firstIndex(where: {$0.user == "danielletan73"})*/{
+                if let studyIndex = dataManager.tasks.firstIndex(where: {$0.name == "study"}), let momIndex = dataManager.chats.firstIndex(where: {$0.user == "danielletan73"}){
+                    dataManager.chats[momIndex].messages.append(Message(isMe: false, text: "Good job on your test son!"))
                     dataManager.tasks[studyIndex].done = true
-                    dataManager.screentime = true
+                    dataManager.score += know
                     dismiss()
                 }
             }

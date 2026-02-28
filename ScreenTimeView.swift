@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ScreenTimeView: View {
     @State private var hours: Int = 1
-    @State private var minutes: Int = 0
+    @State private var minutes: Int = 30
     @State private var downtime: Date = {
         var components = DateComponents()
         components.hour = 23
@@ -52,7 +52,9 @@ struct ScreenTimeView: View {
                         Text("hours")
                         Picker("Minutes", selection: $minutes) {
                             ForEach([0,15,30,45], id: \.self) { i in
-                                Text("\(i)").tag(i)
+                                if !(hours == 0 && i == 0){
+                                    Text("\(i)").tag(i)
+                                }
                             }
                         }
                         .pickerStyle(WheelPickerStyle())
@@ -133,6 +135,7 @@ struct ScreenTimeView: View {
 }
 #Preview {
     ScreenTimeView()
-        .preferredColorScheme(.dark)
         .environment(DataManager())
+        .preferredColorScheme(.light)
+        
 }

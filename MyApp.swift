@@ -25,9 +25,12 @@ import TipKit
     var tabSelection = "feed"
     var following: Set<String> = []
     var videos = premadeVideos
-    var feed: [Video] = []
+//    var feed: [Video] = []
     var screentime = false
     var doneScreentime = false
+    var likedVideos: [Video] = []
+    var videoCount = 0
+    var endings: Set<String> = []
 }
 @main
 struct MyApp: App {
@@ -39,7 +42,7 @@ struct MyApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(dataManager.doneScreentime ? .light : .dark)
+                .preferredColorScheme(dataManager.tabSelection == "screentime" ? .light : .dark)
                 .environment(dataManager)
         }
     }

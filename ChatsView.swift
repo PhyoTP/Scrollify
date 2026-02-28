@@ -7,6 +7,16 @@
 
 import SwiftUI
 
+struct Chat: Equatable{
+    var user: String
+    var messages: [Message]
+}
+struct Message: Identifiable, Equatable{
+    var id = UUID()
+    var isMe: Bool
+    var text: String
+}
+
 struct ChatsView: View {
     @State private var nicknames: [String: String] = ["bobby1479":"my best friend","danielletan73":"Mom"]
     @Environment(DataManager.self) var dataManager
@@ -193,18 +203,39 @@ struct ChatView: View {
                         switch lastText{
                         case "Son":
                             TextButton(text: "Yes?", messages: $chat.messages, typing: $typing, next: ["I just got your exam results", "They've been getting worse and worse", "You're always on the phone", "I never see you study", "I think it's time for you to stop"])
-//                        case "I think it's time "
+                        case "I think it's time for you to stop":
+                            if canApologise{
+                                TextButton(text: "I'm sorry", messages: $chat.messages, typing: $typing, next: [])
+                            }else{
+                                Color.clear
+                                    .frame(height: 1)
+                                    .onAppear {
+                                        if chat.messages.count == 7 {
+                                            dataManager.store = true
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0){
+                                                canApologise = true
+                                            }
+                                        }
+                                    }
+                            }
+                        case "I'm sorry":
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear(){
+                                    dataManager.screentime = true
+                                }
+                        case "Good job on your test son!":
+                            TextButton(text: "Thanks mom!", messages: $chat.messages, typing: $typing, next: [])
+                        case "Thanks mom!":
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear(){
+                                    dataManager.screentime = true
+                                }
                         default:
                             Color.clear
                                 .frame(height: 1)
-                                .onChange(of: chat.messages) {
-                                    if chat.messages.count == 7 {
-                                        dataManager.store = true
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0){
-                                            canApologise = true
-                                        }
-                                    }
-                                }
+                            
                         }
                     default:
                         EmptyView()

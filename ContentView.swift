@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var endingText = ""
     @State private var opacity = 1.0
     @State private var back = false
+    @State private var showCompleteAlert = false
     var body: some View {
         @Bindable var dataManager = dataManager
         if done {
@@ -49,16 +50,16 @@ struct ContentView: View {
                             }
                             .onChange(of: dataManager.doneScreentime) { oldValue, newValue in
                                 if newValue{
-                                        zoomOut = false
-                                        withAnimation(.linear(duration: 5)) {
-                                            scale = 0.5
-                                        }
-                                        withAnimation(.linear.delay(5)) {
-                                            endingText = "The Good Ending"
-                                        }
-                                        withAnimation(.linear.delay(10)) {
-                                            opacity = 0.0
-                                        }
+                                    zoomOut = false
+                                    withAnimation(.linear(duration: 5)) {
+                                        scale = 0.5
+                                    }
+                                    withAnimation(.linear.delay(5)) {
+                                        endingText = "The Good Ending"
+                                    }
+                                    withAnimation(.linear.delay(10)) {
+                                        opacity = 0.0
+                                    }
                                     
                                 }
                             }
@@ -78,8 +79,41 @@ struct ContentView: View {
                     endingText = ""
                     zoomOut = true
                     scale = 1.0
-                    dataManager.tabSelection = "screentime"
+                    dataManager.chats = [
+                        Chat(user: "bobby1479", messages: [
+                            Message(isMe: true, text: "wsg"),
+                            Message(isMe: false, text: "hii"),
+                            Message(isMe: true, text: "how you doin"),
+                            Message(isMe: false, text: "fine hbu"),
+                            Message(isMe: true, text: "pretty chill")
+                        ]),
+                        Chat(user: "danielletan73", messages: [])
+                    ]
+                    if dataManager.endings.isEmpty{
+                        showCompleteAlert = true
+                    }
+                    if dataManager.screentime{
+                        if let bowl = dataManager.tasks.first(where: { $0.name == "bowlingmain"}), bowl.done{
+                            dataManager.endings.insert("bowl")
+                        }else if let study = dataManager.tasks.first(where: { $0.name == "study"}), study.done{
+                            dataManager.endings.insert("study")
+                        }else{
+                            dataManager.endings.insert("sorry")
+                        }
+                    }else{
+                        dataManager.endings.insert("bad")
+                    }
+                    dataManager.tasks.removeAll(where: {["bowlingmain","bowlingmeet","study"].contains($0.name)})
+                    dataManager.screentime = false
+                    dataManager.doneScreentime = false
+                    dataManager.tabSelection = "achievements"
+                    dataManager.newMessages.removeAll()
+                    back = false
+                    
                 }
+            }
+            .alert("You completed a storyline!", isPresented: $showCompleteAlert, actions: {}) {
+                Text("Play again to find more endings")
             }
         }else{
             WelcomeView(done: $done)
@@ -324,6 +358,9 @@ struct EndingView: View {
                 }
             default:
                 Text("wait im not done with this yet")
+                    .onAppear(){
+                        back = true
+                    }
             }
         }
         .font(.custom("Chalkduster", size: 18))
