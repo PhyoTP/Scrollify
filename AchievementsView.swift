@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AchievementsView: View {
-    let achievements = [Achievement(name: "Get all endings", description: "Complete all of the storylines!", total: 4, image: "point.3.connected.trianglepath.dotted"), Achievement(name: "Complete all starting tasks", description: "Back to basics", total: 3, image: "checklist.checked"), Achievement(name: "Watch 20 generated videos", description: "vibe scroller", total: 20, image: "apple.intelligence"), Achievement(name: "Watch 50 videos", description: "I don't think you understood the purpose of the app...", total: 50, image: "play.square.stack.fill")]
+    let achievements = [Achievement(name: "Get all endings", description: "Complete all of the storylines!", total: 4, image: "point.3.connected.trianglepath.dotted"), Achievement(name: "Complete all starting tasks", description: "Back to basics", total: 3, image: "checklist.checked"), Achievement(name: "Watch 20 generated videos", description: "vibe scroller", total: 20, image: "apple.intelligence"), Achievement(name: "Watch 50 videos", description: "I don't think you understood the purpose of the app...", total: 50, image: "play.square.stack.fill"), Achievement(name: "Like videos with 10 different tags", description: "many interests", total: 10, image: "tag.fill")]
     @Environment(DataManager.self) var dataManager
     var body: some View {
         NavigationStack {
@@ -32,6 +32,8 @@ struct AchievementsView: View {
                                 return dataManager.videos.count - premadeVideos.count
                             case "Watch 50 videos":
                                 return dataManager.videoCount
+                            case "Like videos with 10 different tags":
+                                return dataManager.likedTags.count
                             default:
                                 return 0
                             }

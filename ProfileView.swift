@@ -11,6 +11,18 @@ struct ProfileView: View {
     var name: String
     @Environment(DataManager.self) var dataManager
     @State private var showAlert = false
+    var totalSum: UInt64{
+        var totalSum: UInt64 = 0
+            for character in name {
+                if let asciiValue = character.asciiValue {
+                    totalSum += UInt64(asciiValue)
+                } else {
+                    // Handle non-ASCII characters if necessary (e.g., print a warning)
+                    print("Character '\(character)' is not an ASCII character and was skipped.")
+                }
+            }
+            return totalSum
+    }
     var body: some View {
         @Bindable var dataManager = dataManager
         let creatorVideos = dataManager.videos.filter{$0.creator == name}
@@ -26,7 +38,11 @@ struct ProfileView: View {
                     Text(name)
                         .font(.largeTitle)
                         .bold()
-                    Text("\(creatorVideos.count) video\(creatorVideos.count == 1 ? "" : "s")")
+                    HStack{
+                        Text("\(creatorVideos.count) video\(creatorVideos.count == 1 ? "" : "s")")
+                        Divider()
+                        Text("\(totalSum) followers")
+                    }
                         .font(.title)
                     if dataManager.following.contains(name){
                         Button{
@@ -81,6 +97,7 @@ struct ProfileView: View {
         }
     }
 }
-//#Preview {
-//    ProfileView(videos: premadeVideos, name: "cutecats191")
-//}
+#Preview {
+    ProfileView(name: "cutecats191")
+        .environment(DataManager())
+}

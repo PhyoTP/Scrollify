@@ -93,7 +93,58 @@ struct FeedView: View {
                                     ScrollView{
                                         VStack{
                                             ForEach(Array(feed.enumerated()), id: \.element.id) { index, video in
-                                                PlayingVideoView(video: video)
+                                                VStack {
+                                                    HStack{
+                                                        Spacer()
+                                                        Image(systemName: premadeVideos.contains(video) ? "person.crop.circle" : "apple.intelligence")
+                                                            .font(.largeTitle)
+                                                    }
+                                                    Spacer()
+                                                    Text(video.text)
+                                                        .font(.largeTitle)
+                                                        .foregroundStyle(.black)
+                                                        .padding()
+                                                        .background(.white)
+                                                        .mask{
+                                                            RoundedRectangle(cornerRadius: 10)
+                                                        }
+                                                        .multilineTextAlignment(.center)
+                                                    Spacer()
+                                                    if UIImage(systemName: video.image) != nil{
+                                                        Image(systemName: video.image)
+                                                            .font(.system(size: 100))
+                                                    }else if video.emoji.count == 1{
+                                                        Text(video.emoji)
+                                                            .font(.system(size: 100))
+                                                    }else{
+                                                        Image(systemName: "video")
+                                                            .font(.system(size: 100))
+                                                    }
+                                                    Spacer()
+                                                    HStack{
+                                                        VStack(alignment: .leading){
+                                                            Text(video.creator)
+                                                                .bold()
+                                                            Text(video.caption)
+                                                            HStack{
+                                                                ForEach(Array(video.tags), id: \.self){tag in
+                                                                    NavigationLink{
+                                                                        TagView(tag: tag)
+                                                                    }label:{
+                                                                        Text("#\(tag)")
+                                                                            .bold()
+                                                                    }
+                                                                }
+                                                            }
+                                                            .zIndex(100)
+                                                            
+                                                        }
+                                                        Spacer()
+                                                    }
+                                                    .padding(.horizontal, 50)
+                                                }
+                                                .foregroundStyle(.white)
+                                                .padding()
                                                     .frame(maxWidth: geometry.size.height*9/16,minHeight: geometry.size.height*19/20, maxHeight: geometry.size.height)
                                                     .background(Color.accentColor)
                                                     .mask{
@@ -105,6 +156,7 @@ struct FeedView: View {
                                         .offset(y: currentOffset)
                                         
                                     }
+                                    .scrollDisabled(true)
                                     .scrollIndicators(.hidden)
                                     .alert("Unable to generate video:",isPresented: $cannotGenAlert){} message: {
                                         Text(genError)
@@ -178,6 +230,7 @@ struct FeedView: View {
                                     .frame(maxWidth: geometry.size.height*9/16, maxHeight: .infinity)
                                     .ignoresSafeArea()
                                     .opacity(0.01)
+                                    .scaleEffect(y: 0.95)
                                     .simultaneousGesture(DragGesture()
                                         .onChanged{ value in
                                             currentOffset = value.translation.height
@@ -317,58 +370,7 @@ struct VideoView: View {
         .padding()
     }
 }
-struct PlayingVideoView: View {
-    var video: Video
-    var body: some View {
-        VStack {
-            HStack{
-                Spacer()
-                Image(systemName: premadeVideos.contains(video) ? "person.crop.circle" : "apple.intelligence")
-                    .font(.largeTitle)
-            }
-            Spacer()
-            Text(video.text)
-                .font(.largeTitle)
-                .foregroundStyle(.black)
-                .padding()
-                .background(.white)
-                .mask{
-                    RoundedRectangle(cornerRadius: 10)
-                }
-                .multilineTextAlignment(.center)
-            Spacer()
-            if UIImage(systemName: video.image) != nil{
-                Image(systemName: video.image)
-                    .font(.system(size: 100))
-            }else if video.emoji.count == 1{
-                Text(video.emoji)
-                    .font(.system(size: 100))
-            }else{
-                Image(systemName: "video")
-                    .font(.system(size: 100))
-            }
-            Spacer()
-            HStack{
-                VStack(alignment: .leading){
-                    Text(video.creator)
-                        .bold()
-                    Text(video.caption)
-                    HStack{
-                        ForEach(Array(video.tags), id: \.self){tag in
-                            Text("#\(tag)")
-                                .bold()
-                        }
-                    }
-                    
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 50)
-        }
-        .foregroundStyle(.white)
-        .padding()
-    }
-}
+
 
 struct LikeTip: Tip{
     var title: Text {
@@ -402,4 +404,41 @@ struct ScrollTip: Tip{
     var image: Image?{
         Image(systemName: "play.square.stack")
     }
+}
+struct TagView: View {
+    var tag: String
+    @Environment(DataManager.self) var dataManager
+    var filteredVideos: [Video]{
+        dataManager.videos.filter({$0.tags.contains(tag)})
+    }
+    var body: some View {
+        NavigationStack{
+            ScrollView(.vertical){
+                
+                VStack{
+                    LazyVGrid(columns: [GridItem(.flexible()),GridItem(.flexible())]){
+                        ForEach(filteredVideos){video in
+                            NavigationLink{
+                                FeedView(openedVideos: Array(filteredVideos.dropFirst(filteredVideos.firstIndex(of: video) ?? 0)))
+                            }label:{
+                                VideoView(video: video)
+                                    .frame(maxWidth: .infinity)
+                                    .aspectRatio(9.0/16.0, contentMode: .fit)
+                                    .background(Color.accentColor)
+                                    .mask{
+                                        RoundedRectangle(cornerRadius: 50)
+                                    }
+                            }
+                            .padding()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("#\(tag)")
+        }
+    }
+}
+#Preview {
+    TagView(tag: "food")
+        .environment(DataManager())
 }
