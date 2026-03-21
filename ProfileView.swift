@@ -21,6 +21,7 @@ struct ProfileView: View {
                     print("Character '\(character)' is not an ASCII character and was skipped.")
                 }
             }
+        totalSum += dataManager.following.contains(name) ? 1 : 0
             return totalSum
     }
     var body: some View {

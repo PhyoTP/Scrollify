@@ -6,20 +6,21 @@ struct FeedView: View {
     @State private var currentIndex = 0
     @State private var currentOffset: CGFloat = 0
     @State private var lastIndex = 0
-//    @State private var lastScore = 0
+    //    @State private var lastScore = 0
     @Environment(DataManager.self) var dataManager
     @State private var isAutoscrolling = false
     @State private var timer: Timer?
     @State private var lastAutoscroll = false
     @State var tips = TipGroup(.ordered) {
-            ScrollTip()
-            LikeTip()
-            FollowTip()
-        }
+        ScrollTip()
+        LikeTip()
+        FollowTip()
+    }
     var openedVideos: [Video] = []
     @State private var feed: [Video] = []
     @State private var cannotGenAlert = false
     @State private var genError = ""
+    @State private var heartOpacity = 0.0
     var body: some View {
         @Bindable var dataManager = dataManager
         GeometryReader { geometry in
@@ -145,12 +146,12 @@ struct FeedView: View {
                                                 }
                                                 .foregroundStyle(.white)
                                                 .padding()
-                                                    .frame(maxWidth: geometry.size.height*9/16,minHeight: geometry.size.height*19/20, maxHeight: geometry.size.height)
-                                                    .background(Color.accentColor)
-                                                    .mask{
-                                                        RoundedRectangle(cornerRadius: 50)
-                                                    }
-                                                    .id(index)
+                                                .frame(maxWidth: geometry.size.height*9/16,minHeight: geometry.size.height*19/20, maxHeight: geometry.size.height)
+                                                .background(Color.accentColor)
+                                                .mask{
+                                                    RoundedRectangle(cornerRadius: 50)
+                                                }
+                                                .id(index)
                                             }
                                         }
                                         .offset(y: currentOffset)
@@ -231,7 +232,7 @@ struct FeedView: View {
                                     .ignoresSafeArea()
                                     .opacity(0.01)
                                     .scaleEffect(y: 0.95)
-                                    .simultaneousGesture(DragGesture()
+                                    .gesture(DragGesture()
                                         .onChanged{ value in
                                             currentOffset = value.translation.height
                                         }
@@ -251,6 +252,35 @@ struct FeedView: View {
                                             
                                             
                                         })
+                                    .simultaneousGesture(
+                                        TapGesture(count: 2)
+                                            .onEnded {
+                                                if dataManager.likedVideos.contains(feed[currentIndex]){
+                                                    dataManager.likedVideos.removeAll(where: {$0 == feed[currentIndex]})
+                                                }else{
+                                                    dataManager.likedVideos.append(feed[currentIndex])
+                                                    dataManager.likedTags.formUnion(feed[currentIndex].tags)
+                                                    withAnimation(.easeIn(duration: 0.2)) {
+                                                        heartOpacity = 1.0
+                                                    }
+                                                    
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                                                        withAnimation(.easeOut(duration: 0.3)) {
+                                                            heartOpacity = 0.0
+                                                        }
+                                                    }
+                                                }
+                                                if tips.currentTip is LikeTip{
+                                                    tips.currentTip?.invalidate(reason: .actionPerformed)
+                                                }
+                                            }
+                                    )
+                                Image(systemName: "heart.fill")
+                                    .foregroundStyle(.white)
+                                    .font(.system(size: 30))
+                                    .padding()
+                                    .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 25))
+                                    .opacity(heartOpacity)
                             }
                             VStack{
                                 GlassEffectContainer(spacing: 30){
@@ -377,7 +407,7 @@ struct LikeTip: Tip{
         Text("Liking videos")
     }
     var message: Text? {
-        Text("Click this to see more videos like this one and be able to earn more dopamine points!")
+        Text("Double tap the screen or click this to see more videos like this one and be able to earn more dopamine points!")
     }
     var image: Image? {
         Image(systemName: "heart")
